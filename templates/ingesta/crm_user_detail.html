@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle usuario CRM</title>
+    <style>
+        :root {
+            --bg: #eef4f1;
+            --ink: #11231d;
+            --muted: #4e645a;
+            --card: #ffffff;
+            --line: #c7d9d1;
+            --accent: #0f766e;
+            --accent-2: #0b5f59;
+            --in: #1d4ed8;
+            --out: #0f766e;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 15% 10%, rgba(15, 118, 110, .12), transparent 32%),
+                radial-gradient(circle at 85% 16%, rgba(29, 78, 216, .12), transparent 25%),
+                var(--bg);
+        }
+
+        .container {
+            max-width: 1220px;
+            margin: 28px auto;
+            padding: 0 16px 28px;
+        }
+
+        .top {
+            background: linear-gradient(125deg, #0f766e, #11426f);
+            color: #f0fdf4;
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .top h1 {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.1;
+        }
+
+        .top p {
+            margin: 6px 0 0;
+            color: #dcfce7;
+        }
+
+        .back {
+            display: inline-block;
+            text-decoration: none;
+            background: rgba(255,255,255,.2);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .grid-cards {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 10px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 10px;
+        }
+
+        .card .label {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .card .value {
+            margin-top: 2px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .layout {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 12px;
+        }
+
+        .panel {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 19px;
+        }
+
+        .sub {
+            margin: 5px 0 10px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .form-row input {
+            width: 100%;
+            border: 1px solid #cfdad4;
+            border-radius: 8px;
+            padding: 9px 10px;
+            font-size: 14px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #fff;
+            padding: 9px 12px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .btn:hover { background: var(--accent-2); }
+
+        .ok {
+            background: #def7e8;
+            color: #155d3b;
+            border: 1px solid #bde9d2;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .kv {
+            display: grid;
+            gap: 7px;
+            margin-top: 8px;
+            font-size: 14px;
+        }
+
+        .kv .row {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            gap: 8px;
+            border-bottom: 1px solid #edf3f0;
+            padding-bottom: 6px;
+        }
+
+        .kv .k {
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .table-scroll {
+            max-height: 370px;
+            overflow: auto;
+            border: 1px solid #e3ece8;
+            border-radius: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #edf3f0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f6faf8;
+            color: #214638;
+            font-weight: 700;
+        }
+
+        .pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pill.in { background: #dbeafe; color: #1e40af; }
+        .pill.out { background: #dcfce7; color: #166534; }
+
+        .two-cols {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .msg {
+            border-bottom: 1px solid #edf3f0;
+            padding: 8px 0;
+            font-size: 13px;
+        }
+
+        .msg .meta {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .msg .txt {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @media (max-width: 1024px) {
+            .layout { grid-template-columns: 1fr; }
+            .two-cols { grid-template-columns: 1fr; }
+            .kv .row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <section class="top">
+            <div>
+                <h1>{{ user.name|default:user.phone_number|default:user.wa_id }}</h1>
+                <p>Perfil detallado del contacto en CRM</p>
+            </div>
+            <a class="back" href="/ingesta/crm/">Volver al dashboard</a>
+        </section>
+
+        <section class="grid-cards">
+            <article class="card">
+                <div class="label">Mensajes totales</div>
+                <div class="value">{{ total_messages }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Mensajes de cliente</div>
+                <div class="value">{{ inbound_count }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Respuestas nuestras</div>
+                <div class="value">{{ outbound_count }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Días desde última interacción</div>
+                <div class="value">{% if days_since_last != None %}{{ days_since_last }}{% else %}-{% endif %}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio respuesta (días)</div>
+                <div class="value">{{ avg_response_days|floatformat:2 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio respuesta nuestra (horas)</div>
+                <div class="value">{{ avg_response_hours|floatformat:1 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio entre interacciones (días)</div>
+                <div class="value">{% if avg_gap_days != None %}{{ avg_gap_days|floatformat:2 }}{% else %}-{% endif %}</div>
+            </article>
+            <article class="card">
+                <div class="label">Días desde nuestra última acción</div>
+                <div class="value">{% if days_since_last_our_action != None %}{{ days_since_last_our_action }}{% else %}-{% endif %}</div>
+            </article>
+            <article class="card">
+                <div class="label">Media disponible</div>
+                <div class="value">{{ available_media_count }}</div>
+            </article>
+            <article class="card">
+                <div class="label">NO_MEDIA (ocultos en detalle)</div>
+                <div class="value">{{ no_media_count }}</div>
+            </article>
+            <article class="card">
+                <div class="label">ENCRYPTED (.enc) ocultos</div>
+                <div class="value">{{ encrypted_media_count }}</div>
+            </article>
+        </section>
+
+        <section class="layout">
+            <article class="panel">
+                <h2>Información del usuario</h2>
+                <p class="sub">Puedes actualizar el nombre guardado para futuras cargas.</p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="form-row">
+                        <input type="text" name="name" value="{{ user.name }}" placeholder="Nombre del contacto">
+                        <button class="btn" type="submit">Guardar nombre</button>
+                    </div>
+                </form>
+                {% if name_updated %}
+                <div class="ok">Nombre actualizado correctamente.</div>
+                {% endif %}
+
+                <div class="kv">
+                    <div class="row"><div class="k">wa_id</div><div>{{ user.wa_id }}</div></div>
+                    <div class="row"><div class="k">Número</div><div>{{ user.phone_number|default:"-" }}</div></div>
+                    <div class="row"><div class="k">Última interacción</div><div>{% if user.last_interaction %}{{ user.last_interaction|date:"Y-m-d H:i" }}{% else %}-{% endif %}</div></div>
+                    <div class="row"><div class="k">Última acción nuestra</div><div>{% if last_our_action %}{{ last_our_action|date:"Y-m-d H:i" }}{% else %}-{% endif %}</div></div>
+                    <div class="row"><div class="k">Primer mensaje</div><div>{% if first_message %}{{ first_message.timestamp|date:"Y-m-d H:i" }}{% else %}-{% endif %}</div></div>
+                    <div class="row"><div class="k">Último mensaje</div><div>{% if latest_message %}{{ latest_message.timestamp|date:"Y-m-d H:i" }}{% else %}-{% endif %}</div></div>
+                    <div class="row"><div class="k">Días con interacción</div><div>{{ interaction_days }}</div></div>
+                    <div class="row"><div class="k">Muestras respuesta</div><div>{{ response_samples }}</div></div>
+                </div>
+            </article>
+
+            <article class="panel">
+                <h2>Tipos de mensaje</h2>
+                <p class="sub">Distribución por tipo detectado en la ingesta.</p>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in message_type_rows %}
+                            <tr>
+                                <td>{{ row.message_type }}</td>
+                                <td>{{ row.total }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2">Sin mensajes.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+
+        <section class="panel" style="margin-top:12px;">
+            <h2>Resumen IA del mes</h2>
+            {% if monthly_current_summary %}
+            <p class="sub">{{ monthly_current_summary.year }}-{{ monthly_current_summary.month|stringformat:"02d" }} | revisión {{ monthly_current_summary.revision }}</p>
+            <div class="msg">
+                <div class="txt">{{ monthly_current_summary.text|default:"NO_DATA" }}</div>
+                <div class="meta">Tokens: {{ monthly_current_summary.total_tokens }} | Mensajes base: {{ monthly_current_summary.source_message_count }}</div>
+            </div>
+            {% if monthly_current_summary.pending_items %}
+            <div class="sub"><strong>Pendientes:</strong> {{ monthly_current_summary.pending_items|join:", " }}</div>
+            {% endif %}
+            {% else %}
+            <p class="sub">Sin resumen mensual disponible.</p>
+            {% endif %}
+        </section>
+
+        <section class="panel" style="margin-top:12px;">
+            <h2>Resúmenes IA por día</h2>
+            <p class="sub">Solo mensajes de texto (cliente + equipo), evitando reproceso si no hay cambios.</p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Resumen puntual</th>
+                            <th>Pendientes</th>
+                            <th>Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in daily_summaries %}
+                        <tr>
+                            <td>{{ row.summary_date|date:"Y-m-d" }}</td>
+                            <td>{{ row.text|default:"NO_DATA" }}</td>
+                            <td>{% if row.pending_items %}{{ row.pending_items|join:", " }}{% else %}-{% endif %}</td>
+                            <td>{{ row.total_tokens }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">Sin resúmenes diarios disponibles.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel" style="margin-top:12px;">
+            <h2>Últimos mensajes (timeline combinado)</h2>
+            <p class="sub">Más recientes primero, mezclando cliente y equipo. Se ocultan mensajes media sin archivo (NO_MEDIA) y archivos cifrados (.enc).</p>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Dirección</th>
+                            <th>Tipo</th>
+                            <th>Contenido</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for msg in recent_messages %}
+                        <tr>
+                            <td>{{ msg.timestamp|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if msg.from_me %}
+                                <span class="pill out">Nosotros</span>
+                                {% else %}
+                                <span class="pill in">Cliente</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ msg.message_type }}</td>
+                            <td>{{ msg.content|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">Sin mensajes.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="two-cols">
+            <article class="panel">
+                <h2>Últimos mensajes del cliente</h2>
+                <p class="sub">Últimos 20 inbound visibles (sin NO_MEDIA ni .enc).</p>
+                {% for msg in inbound_messages %}
+                <div class="msg">
+                    <div class="meta">{{ msg.timestamp|date:"Y-m-d H:i" }} | {{ msg.message_type }}</div>
+                    <div class="txt">{{ msg.content|default:"-" }}</div>
+                </div>
+                {% empty %}
+                <div class="sub">Sin mensajes del cliente.</div>
+                {% endfor %}
+            </article>
+
+            <article class="panel">
+                <h2>Últimos mensajes nuestros</h2>
+                <p class="sub">Últimos 20 outbound visibles (sin NO_MEDIA ni .enc).</p>
+                {% for msg in outbound_messages %}
+                <div class="msg">
+                    <div class="meta">{{ msg.timestamp|date:"Y-m-d H:i" }} | {{ msg.message_type }}</div>
+                    <div class="txt">{{ msg.content|default:"-" }}</div>
+                </div>
+                {% empty %}
+                <div class="sub">Sin mensajes nuestros.</div>
+                {% endfor %}
+            </article>
+        </section>
+    </main>
+</body>
+</html>

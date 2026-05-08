@@ -1,0 +1,1 @@
+c:\python312\python.exe: can't open file 'C:\\Users\\Janus\\Documents\\SAMA\\app SAMA\\__db_decode_probe_standalone.py': [Errno 2] No such file or directory

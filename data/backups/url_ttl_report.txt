@@ -1,0 +1,14 @@
+rows=160
+urls_with_parsed_oe=160
+missing_oe=0
+bad_oe=0
+now_utc=2026-04-17T06:37:05.414500+00:00
+min_oe_utc=2026-04-28T15:32:09+00:00
+max_oe_utc=2026-05-01T20:22:49+00:00
+min_oe_age_days=-11.37
+max_oe_age_days=-14.57
+p10_oe_utc=2026-04-28T19:16:50+00:00 age_days=-11.53
+p25_oe_utc=2026-04-29T02:54:53+00:00 age_days=-11.85
+p50_oe_utc=2026-04-29T14:16:56+00:00 age_days=-12.32
+p75_oe_utc=2026-04-29T17:58:08+00:00 age_days=-12.47
+p90_oe_utc=2026-04-29T20:44:57+00:00 age_days=-12.59

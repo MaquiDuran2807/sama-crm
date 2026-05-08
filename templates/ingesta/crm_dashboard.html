@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Dashboard</title>
+    <style>
+        :root {
+            --bg: #eef4f1;
+            --ink: #10221c;
+            --muted: #4a6258;
+            --card: #ffffff;
+            --line: #c8d9d0;
+            --accent: #0f766e;
+            --accent-2: #0a5d58;
+            --inbound: #1d4ed8;
+            --outbound: #0f766e;
+            --warn-10: #16a34a;
+            --warn-20: #ca8a04;
+            --warn-40: #dc2626;
+            --danger-bg: #ffe7e7;
+            --danger-ink: #8a1f1f;
+            --ok-bg: #def7e8;
+            --ok-ink: #0f5a36;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 15% 12%, rgba(15, 118, 110, .15), transparent 30%),
+                radial-gradient(circle at 90% 20%, rgba(29, 78, 216, .14), transparent 24%),
+                var(--bg);
+        }
+
+        .container {
+            max-width: min(96vw, 1760px);
+            margin: 18px auto;
+            padding: 0 10px 22px;
+        }
+
+        .hero {
+            background: linear-gradient(125deg, #0f766e, #11426f);
+            color: #f0fdf4;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 18px 38px rgba(17, 66, 111, .28);
+        }
+
+        .hero h1 {
+            margin: 0;
+            font-size: 32px;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            margin: 10px 0 0;
+            max-width: 920px;
+            line-height: 1.5;
+            color: #dcfce7;
+        }
+
+        .filters {
+            margin-top: 14px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            align-items: end;
+        }
+
+        .filters label {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .filters input,
+        .filters select {
+            width: 100%;
+            border: 1px solid #cfdad4;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            background: #fff;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #fff;
+            padding: 9px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .btn:hover { background: var(--accent-2); }
+
+        .btn.secondary {
+            background: #d7ebe3;
+            color: #0b4e44;
+        }
+
+        .cards {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 10px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .card .label {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+
+        .card .value {
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .layout {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.9fr) minmax(360px, 1fr);
+            gap: 12px;
+        }
+
+        .layout > .panel {
+            min-width: 0;
+        }
+
+        .panel {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 19px;
+        }
+
+        .sub {
+            margin: 6px 0 10px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .table-scroll {
+            max-height: 440px;
+            overflow: auto;
+            border: 1px solid #e3ece8;
+            border-radius: 10px;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        #activity-table {
+            min-width: 1420px;
+        }
+
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #edf3f0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        #activity-table th,
+        #activity-table td {
+            white-space: nowrap;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f5faf8;
+            color: #214638;
+            font-weight: 700;
+        }
+
+        .pill {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-right: 5px;
+        }
+
+        .pill.ok {
+            background: var(--ok-bg);
+            color: var(--ok-ink);
+        }
+
+        .pill.warn {
+            background: var(--danger-bg);
+            color: var(--danger-ink);
+        }
+
+        .pill.recency {
+            margin-right: 0;
+            min-width: 72px;
+            text-align: center;
+        }
+
+        .pill.recency.r10 {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .pill.recency.r20 {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .pill.recency.r40 {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        tr.row-r20 td {
+            background: #fffde9;
+        }
+
+        tr.row-r40 td {
+            background: #fff1f1;
+        }
+
+        .bar-list {
+            display: grid;
+            gap: 7px;
+        }
+
+        .bar-row {
+            display: grid;
+            grid-template-columns: 125px 1fr 40px;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+        }
+
+        .bar-track {
+            height: 10px;
+            border-radius: 999px;
+            background: #e3ece8;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0;
+            border-radius: 999px;
+        }
+
+        .bar-fill.inbound { background: var(--inbound); }
+        .bar-fill.outbound { background: var(--outbound); }
+        .bar-fill.stale { background: #b45309; }
+
+        .legend {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: #345548;
+            margin-bottom: 8px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            margin-right: 4px;
+        }
+
+        .edit-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .edit-row input {
+            width: 100%;
+            border: 1px solid #cfdad4;
+            border-radius: 7px;
+            padding: 6px 8px;
+            font-size: 12px;
+        }
+
+        .flash {
+            margin-top: 8px;
+            min-height: 18px;
+            font-size: 13px;
+            color: #0a5d58;
+        }
+
+        .table-tools {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin: 8px 0 10px;
+        }
+
+        .table-tools .mini-btn {
+            border: 1px solid #bfd4cb;
+            background: #f6fbf9;
+            color: #174338;
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .table-tools .mini-btn.active {
+            background: #d7ebe3;
+            border-color: #89b8a8;
+        }
+
+        .table-tools .hint {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        th.sortable .arrow {
+            margin-left: 4px;
+            color: #4f7768;
+            font-size: 11px;
+        }
+
+        .user-link {
+            color: #0d5f8c;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .user-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1024px) {
+            .layout { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 28px; }
+            .container {
+                max-width: 100%;
+                margin: 12px auto;
+                padding: 0 8px 18px;
+            }
+            #activity-table {
+                min-width: 1120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <section class="hero">
+            <h1>Dashboard CRM de Conversaciones</h1>
+            <p>
+                Ya incluye dos señales separadas: promedio histórico entre interacciones y distancia actual desde la última interacción.
+                Así puedes detectar contactos activos y también contactos fríos como Mariel.
+            </p>
+        </section>
+
+        <form method="get" class="filters">
+            <div>
+                <label for="q">Buscar</label>
+                <input id="q" name="q" value="{{ filters.q }}" placeholder="Nombre, número o wa_id">
+            </div>
+            <div>
+                <label for="name_status">Estado nombre</label>
+                <select id="name_status" name="name_status">
+                    <option value="all" {% if filters.name_status == "all" %}selected{% endif %}>Todos</option>
+                    <option value="named" {% if filters.name_status == "named" %}selected{% endif %}>Con nombre</option>
+                    <option value="unnamed" {% if filters.name_status == "unnamed" %}selected{% endif %}>Sin nombre</option>
+                </select>
+            </div>
+            <div>
+                <label for="stale_min">Mín. días sin interacción</label>
+                <input id="stale_min" type="number" min="0" name="stale_min" value="{{ filters.stale_min }}">
+            </div>
+            <div>
+                <label for="min_inbound">Mín. mensajes cliente</label>
+                <input id="min_inbound" type="number" min="0" name="min_inbound" value="{{ filters.min_inbound }}">
+            </div>
+            <div>
+                <label for="min_outbound">Mín. respuestas nuestras</label>
+                <input id="min_outbound" type="number" min="0" name="min_outbound" value="{{ filters.min_outbound }}">
+            </div>
+            <div>
+                <label for="sort_by">Ordenar por</label>
+                <select id="sort_by" name="sort_by">
+                    <option value="inbound" {% if filters.sort_by == "inbound" %}selected{% endif %}>Mensajes cliente</option>
+                    <option value="outbound" {% if filters.sort_by == "outbound" %}selected{% endif %}>Respuestas nuestras</option>
+                    <option value="total" {% if filters.sort_by == "total" %}selected{% endif %}>Total mensajes</option>
+                    <option value="avg_gap" {% if filters.sort_by == "avg_gap" %}selected{% endif %}>Promedio entre interacciones</option>
+                    <option value="days_since_last" {% if filters.sort_by == "days_since_last" %}selected{% endif %}>Días desde última interacción</option>
+                    <option value="last_interaction" {% if filters.sort_by == "last_interaction" %}selected{% endif %}>Fecha última interacción</option>
+                    <option value="name" {% if filters.sort_by == "name" %}selected{% endif %}>Nombre</option>
+                </select>
+            </div>
+            <div>
+                <label for="sort_dir">Dirección</label>
+                <select id="sort_dir" name="sort_dir">
+                    <option value="desc" {% if filters.sort_dir == "desc" %}selected{% endif %}>Descendente</option>
+                    <option value="asc" {% if filters.sort_dir == "asc" %}selected{% endif %}>Ascendente</option>
+                </select>
+            </div>
+            <div>
+                <label for="limit">Máx. filas</label>
+                <input id="limit" type="number" min="10" max="250" name="limit" value="{{ filters.limit }}">
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit">Aplicar</button>
+                <a class="btn secondary" href="/ingesta/crm/">Limpiar</a>
+            </div>
+        </form>
+
+        <section class="cards">
+            <article class="card">
+                <div class="label">Usuarios totales</div>
+                <div class="value">{{ total_users }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Usuarios filtrados</div>
+                <div class="value">{{ filtered_count }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio respuesta (días)</div>
+                <div class="value">{{ avg_response_days|floatformat:2 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio respuesta nuestra (horas)</div>
+                <div class="value">{{ avg_response_hours|floatformat:1 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio entre interacciones (días)</div>
+                <div class="value">{{ global_avg_gap_days|floatformat:2 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Promedio días desde última interacción</div>
+                <div class="value">{{ avg_days_since_last|floatformat:1 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Mayor distancia desde última interacción</div>
+                <div class="value">{{ max_days_since_last }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Usuarios fríos (30+ días)</div>
+                <div class="value">{{ cold_users_30 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Usuarios muy fríos (90+ días)</div>
+                <div class="value">{{ cold_users_90 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Semáforo 10+ días</div>
+                <div class="value" style="color: var(--warn-10);">{{ stale_10 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Semáforo 20+ días</div>
+                <div class="value" style="color: var(--warn-20);">{{ stale_20 }}</div>
+            </article>
+            <article class="card">
+                <div class="label">Semáforo 40+ días</div>
+                <div class="value" style="color: var(--warn-40);">{{ stale_40 }}</div>
+            </article>
+        </section>
+
+        <section class="layout">
+            <article class="panel">
+                <h2>Usuarios por actividad y recencia</h2>
+                <p class="sub">Incluye días desde última interacción para separar histórico vs situación actual.</p>
+                <div class="table-tools" id="activity-table-tools">
+                    <button type="button" class="mini-btn active" data-kind-filter="all">Todos</button>
+                    <button type="button" class="mini-btn" data-kind-filter="letters">Solo letras</button>
+                    <button type="button" class="mini-btn" data-kind-filter="numbers">Solo números</button>
+                    <span class="hint">Ordena haciendo clic en cualquier título de columna.</span>
+                </div>
+                <div class="table-scroll">
+                    <table id="activity-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort-key="user" data-sort-type="text">Usuario<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="number" data-sort-type="text">Número<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="cliente" data-sort-type="number">Cliente<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="nosotros" data-sort-type="number">Nosotros<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="total" data-sort-type="number">Total<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="gap" data-sort-type="number">Prom. gap días<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="resp_nos" data-sort-type="number">Prom. resp. nuestra (h)<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="dias" data-sort-type="number">Días desde última<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="dias_nos" data-sort-type="number">Días desde última nuestra<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="semaforo" data-sort-type="text">Semáforo<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="ultima" data-sort-type="date">Última interacción<span class="arrow"></span></th>
+                                <th class="sortable" data-sort-key="ultima_nos" data-sort-type="date">Última acción nuestra<span class="arrow"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="activity-table-body">
+                            {% for user in top_users %}
+                            <tr
+                                class="{% if user.days_since_last_interaction != None and user.days_since_last_interaction >= 40 %}row-r40{% elif user.days_since_last_interaction != None and user.days_since_last_interaction >= 20 %}row-r20{% endif %}"
+                                data-kind="{{ user.data_kind }}"
+                            >
+                                <td>
+                                    {% if user.name %}
+                                        <span class="pill ok">Con nombre</span><a class="user-link" href="/ingesta/crm/user/{{ user.id }}/">{{ user.name }}</a>
+                                    {% else %}
+                                        <span class="pill warn">Sin nombre</span><a class="user-link" href="/ingesta/crm/user/{{ user.id }}/">{{ user.wa_id }}</a>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.phone_number|default:user.wa_id }}</td>
+                                <td>{{ user.inbound_count }}</td>
+                                <td>{{ user.outbound_count }}</td>
+                                <td>{{ user.total_count }}</td>
+                                <td>{% if user.avg_gap_days != None %}{{ user.avg_gap_days|floatformat:2 }}{% else %}-{% endif %}</td>
+                                <td>{% if user.avg_our_response_hours != None %}{{ user.avg_our_response_hours|floatformat:1 }}{% else %}-{% endif %}</td>
+                                <td>{% if user.days_since_last_interaction != None %}{{ user.days_since_last_interaction }}{% else %}-{% endif %}</td>
+                                <td>{% if user.days_since_last_our_action != None %}{{ user.days_since_last_our_action }}{% else %}-{% endif %}</td>
+                                <td>
+                                    {% if user.days_since_last_interaction == None %}
+                                        <span class="pill recency">N/D</span>
+                                    {% elif user.days_since_last_interaction < 10 %}
+                                        <span class="pill recency r10">&lt; 10</span>
+                                    {% elif user.days_since_last_interaction < 20 %}
+                                        <span class="pill recency r10">10+</span>
+                                    {% elif user.days_since_last_interaction < 40 %}
+                                        <span class="pill recency r20">20+</span>
+                                    {% else %}
+                                        <span class="pill recency r40">40+</span>
+                                    {% endif %}
+                                </td>
+                                <td>{% if user.last_interaction %}{{ user.last_interaction|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                                <td>{% if user.last_our_action %}{{ user.last_our_action|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="12">No hay resultados para los filtros actuales.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="panel">
+                <h2>Gráficos y foco comercial</h2>
+                <p class="sub">
+                    {% if most_stale_user %}
+                    Contacto más frío: {{ most_stale_user.name|default:most_stale_user.phone_number|default:most_stale_user.wa_id }} ({{ max_days_since_last }} días).
+                    {% else %}
+                    Aún no hay datos suficientes para calcular recencia.
+                    {% endif %}
+                </p>
+
+                <div class="legend">
+                    <span><span class="dot" style="background: var(--inbound);"></span>Mensajes cliente</span>
+                    <span><span class="dot" style="background: var(--outbound);"></span>Respuestas nuestras</span>
+                </div>
+                <div id="activity-bars" class="bar-list"></div>
+
+                <h3 style="margin:14px 0 8px;font-size:15px;">Distribución por recencia</h3>
+                <div id="stale-bars" class="bar-list"></div>
+
+                <h3 style="margin:14px 0 8px;font-size:15px;">Top contactos fríos</h3>
+                <div class="table-scroll" style="max-height:180px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Días sin interacción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in stale_users %}
+                            <tr>
+                                <td><a class="user-link" href="/ingesta/crm/user/{{ user.id }}/">{{ user.name|default:user.phone_number|default:user.wa_id }}</a></td>
+                                <td>{{ user.days_since_last_interaction }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="2">Sin datos.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+        </section>
+
+        <section class="layout" style="margin-top:12px;grid-template-columns:1fr;">
+            <article class="panel">
+                <h2>Usuarios sin nombre</h2>
+                <p class="sub">Edita aquí y el sistema conservará el nombre aunque lleguen nuevas cargas del mismo número.</p>
+                <div class="table-scroll" style="max-height:260px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>wa_id</th>
+                                <th>Número</th>
+                                <th>Última interacción</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in unnamed_users %}
+                            <tr>
+                                <td><a class="user-link" href="/ingesta/crm/user/{{ user.id }}/">{{ user.wa_id }}</a></td>
+                                <td>{{ user.phone_number|default:"-" }}</td>
+                                <td>{% if user.last_interaction %}{{ user.last_interaction|date:"Y-m-d H:i" }}{% else %}-{% endif %}</td>
+                                <td>
+                                    <div class="edit-row">
+                                        <input type="text" id="name-{{ user.id }}" placeholder="Ej: Mariel López">
+                                        <button class="btn" data-user-id="{{ user.id }}">Guardar</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4">No hay usuarios sin nombre.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flash" id="flash"></div>
+            </article>
+        </section>
+    </main>
+
+    {{ chart_labels|json_script:"chart-labels" }}
+    {{ chart_inbound|json_script:"chart-inbound" }}
+    {{ chart_outbound|json_script:"chart-outbound" }}
+    {{ stale_distribution|json_script:"stale-distribution" }}
+
+    <script>
+        const flash = document.getElementById("flash");
+
+        function setFlash(text, isError = false) {
+            flash.textContent = text;
+            flash.style.color = isError ? "#8a1f1f" : "#0a5d58";
+        }
+
+        async function renameUser(userId, name) {
+            const response = await fetch("/ingesta/api/chat-users/rename/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ user_id: userId, name })
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || "No se pudo guardar");
+            }
+            return data;
+        }
+
+        function renderBars() {
+            const labels = JSON.parse(document.getElementById("chart-labels").textContent || "[]");
+            const inbound = JSON.parse(document.getElementById("chart-inbound").textContent || "[]");
+            const outbound = JSON.parse(document.getElementById("chart-outbound").textContent || "[]");
+            const staleDistribution = JSON.parse(document.getElementById("stale-distribution").textContent || "[]");
+
+            const activityContainer = document.getElementById("activity-bars");
+            const staleContainer = document.getElementById("stale-bars");
+
+            const maxActivity = Math.max(1, ...inbound, ...outbound);
+            labels.forEach((label, index) => {
+                const row = document.createElement("div");
+                row.className = "bar-row";
+
+                const left = document.createElement("div");
+                left.textContent = label;
+
+                const tracks = document.createElement("div");
+                tracks.style.display = "grid";
+                tracks.style.gap = "3px";
+
+                const inboundTrack = document.createElement("div");
+                inboundTrack.className = "bar-track";
+                const inboundFill = document.createElement("div");
+                inboundFill.className = "bar-fill inbound";
+                inboundFill.style.width = `${(inbound[index] / maxActivity) * 100}%`;
+                inboundTrack.appendChild(inboundFill);
+
+                const outboundTrack = document.createElement("div");
+                outboundTrack.className = "bar-track";
+                const outboundFill = document.createElement("div");
+                outboundFill.className = "bar-fill outbound";
+                outboundFill.style.width = `${(outbound[index] / maxActivity) * 100}%`;
+                outboundTrack.appendChild(outboundFill);
+
+                tracks.appendChild(inboundTrack);
+                tracks.appendChild(outboundTrack);
+
+                const right = document.createElement("div");
+                right.textContent = `${inbound[index]}/${outbound[index]}`;
+
+                row.appendChild(left);
+                row.appendChild(tracks);
+                row.appendChild(right);
+                activityContainer.appendChild(row);
+            });
+
+            const maxStale = Math.max(1, ...staleDistribution.map(x => x.count));
+            staleDistribution.forEach(item => {
+                const row = document.createElement("div");
+                row.className = "bar-row";
+
+                const left = document.createElement("div");
+                left.textContent = item.label;
+
+                const track = document.createElement("div");
+                track.className = "bar-track";
+                const fill = document.createElement("div");
+                fill.className = "bar-fill stale";
+                fill.style.width = `${(item.count / maxStale) * 100}%`;
+                track.appendChild(fill);
+
+                const right = document.createElement("div");
+                right.textContent = item.count;
+
+                row.appendChild(left);
+                row.appendChild(track);
+                row.appendChild(right);
+                staleContainer.appendChild(row);
+            });
+        }
+
+        function setupActivityTableTools() {
+            const table = document.getElementById("activity-table");
+            const tbody = document.getElementById("activity-table-body");
+            const toolWrap = document.getElementById("activity-table-tools");
+            if (!table || !tbody || !toolWrap) {
+                return;
+            }
+
+            const state = {
+                sortKey: null,
+                sortDir: "asc",
+                kindFilter: "all"
+            };
+
+            const getRows = () => Array.from(tbody.querySelectorAll("tr"));
+
+            function cleanCellText(cell) {
+                if (!cell) return "";
+                return (cell.textContent || "").replace(/\s+/g, " ").trim();
+            }
+
+            function parseValue(row, key, type) {
+                const map = {
+                    user: 0,
+                    number: 1,
+                    cliente: 2,
+                    nosotros: 3,
+                    total: 4,
+                    gap: 5,
+                    resp_nos: 6,
+                    dias: 7,
+                    dias_nos: 8,
+                    semaforo: 9,
+                    ultima: 10,
+                    ultima_nos: 11
+                };
+
+                const idx = map[key];
+                const cell = row.cells[idx];
+                const raw = cleanCellText(cell);
+
+                if (type === "number") {
+                    const n = Number(raw.replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
+                    return Number.isFinite(n) ? n : -Infinity;
+                }
+
+                if (type === "date") {
+                    if (!raw || raw === "-") return -Infinity;
+                    const t = Date.parse(raw.replace(" ", "T"));
+                    return Number.isFinite(t) ? t : -Infinity;
+                }
+
+                return raw.toLocaleLowerCase("es");
+            }
+
+            function applyFilter(rows) {
+                let visible = 0;
+                rows.forEach(row => {
+                    const kind = row.getAttribute("data-kind") || "numbers";
+                    const show = state.kindFilter === "all" || state.kindFilter === kind;
+                    row.style.display = show ? "" : "none";
+                    if (show) visible += 1;
+                });
+                return visible;
+            }
+
+            function sortRows(rows, key, type, dir) {
+                const factor = dir === "asc" ? 1 : -1;
+                rows.sort((a, b) => {
+                    const av = parseValue(a, key, type);
+                    const bv = parseValue(b, key, type);
+
+                    if (type === "text") {
+                        return av.localeCompare(bv, "es", { sensitivity: "base" }) * factor;
+                    }
+
+                    if (av < bv) return -1 * factor;
+                    if (av > bv) return 1 * factor;
+                    return 0;
+                });
+
+                rows.forEach(row => tbody.appendChild(row));
+            }
+
+            function updateHeaderArrows() {
+                table.querySelectorAll("th.sortable").forEach(th => {
+                    const arrow = th.querySelector(".arrow");
+                    if (!arrow) return;
+                    const thKey = th.getAttribute("data-sort-key");
+                    if (thKey === state.sortKey) {
+                        arrow.textContent = state.sortDir === "asc" ? "▲" : "▼";
+                    } else {
+                        arrow.textContent = "";
+                    }
+                });
+            }
+
+            function updateFilterButtons() {
+                toolWrap.querySelectorAll("button[data-kind-filter]").forEach(btn => {
+                    const filter = btn.getAttribute("data-kind-filter");
+                    btn.classList.toggle("active", filter === state.kindFilter);
+                });
+            }
+
+            table.querySelectorAll("th.sortable").forEach(th => {
+                th.addEventListener("click", () => {
+                    const key = th.getAttribute("data-sort-key");
+                    const type = th.getAttribute("data-sort-type") || "text";
+                    if (!key) return;
+
+                    if (state.sortKey === key) {
+                        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+                    } else {
+                        state.sortKey = key;
+                        state.sortDir = "asc";
+                    }
+
+                    const rows = getRows();
+                    sortRows(rows, state.sortKey, type, state.sortDir);
+                    applyFilter(rows);
+                    updateHeaderArrows();
+                });
+            });
+
+            toolWrap.querySelectorAll("button[data-kind-filter]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    state.kindFilter = btn.getAttribute("data-kind-filter") || "all";
+                    const rows = getRows();
+                    applyFilter(rows);
+                    updateFilterButtons();
+                });
+            });
+
+            const initialRows = getRows();
+            sortRows(initialRows, "cliente", "number", "desc");
+            state.sortKey = "cliente";
+            state.sortDir = "desc";
+            applyFilter(initialRows);
+            updateHeaderArrows();
+            updateFilterButtons();
+        }
+
+        document.querySelectorAll("button[data-user-id]").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const userId = btn.getAttribute("data-user-id");
+                const input = document.getElementById(`name-${userId}`);
+                const name = (input.value || "").trim();
+                if (!name) {
+                    setFlash("Escribe un nombre antes de guardar.", true);
+                    return;
+                }
+
+                btn.disabled = true;
+                try {
+                    await renameUser(userId, name);
+                    setFlash("Nombre guardado correctamente. Recarga para ver cambios en filtros y tablas.");
+                    input.value = "";
+                } catch (error) {
+                    setFlash(error.message, true);
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        renderBars();
+        setupActivityTableTools();
+    </script>
+</body>
+</html>

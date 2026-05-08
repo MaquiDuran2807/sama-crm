@@ -1,0 +1,20 @@
+matched_rows=80
+now_utc=2026-04-17T06:37:35.410425+00:00
+delta_days_min=28.78
+delta_days_p10=29.85
+delta_days_p25=29.88
+delta_days_p50=29.93
+delta_days_p75=29.97
+delta_days_p90=29.99
+delta_days_max=30.00
+sample_first_10=
+cmnuo3r7901trog79lv102rda msg=2026-03-31T17:35:02+00:00 oe=2026-04-29T12:22:49+00:00 delta_days=28.78
+cmnuo3r9o02y2og7903r2y530 msg=2026-03-29T21:35:11+00:00 oe=2026-04-28T17:36:22+00:00 delta_days=29.83
+cmnuo3r9i02uuog79g6g4ycwq msg=2026-03-29T19:23:40+00:00 oe=2026-04-28T15:32:09+00:00 delta_days=29.84
+cmnuo3rbc034cog797s5dnfxp msg=2026-03-30T20:18:23+00:00 oe=2026-04-29T16:29:55+00:00 delta_days=29.84
+cmnuo3rbd034mog79p5uhbkq1 msg=2026-03-30T20:50:31+00:00 oe=2026-04-29T17:05:07+00:00 delta_days=29.84
+cmnuo3rbd034kog790jlervgl msg=2026-03-30T15:43:42+00:00 oe=2026-04-29T12:01:05+00:00 delta_days=29.85
+cmnuo3r8e02egog79gjyns1cr msg=2026-03-31T00:08:42+00:00 oe=2026-04-29T20:26:35+00:00 delta_days=29.85
+cmnuo3r7a01u9og7928utmsor msg=2026-03-30T02:35:22+00:00 oe=2026-04-28T22:56:20+00:00 delta_days=29.85
+cmnuo2dvz006fog798tlgg4xo msg=2026-03-30T20:51:28+00:00 oe=2026-04-29T17:14:24+00:00 delta_days=29.85
+cmnuo3r9o02yfog793x8wkhzj msg=2026-03-30T12:10:46+00:00 oe=2026-04-29T08:35:16+00:00 delta_days=29.85

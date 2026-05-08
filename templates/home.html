@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_title }}</title>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --ink: #0f172a;
+            --muted: #475569;
+            --brand: #0e7490;
+            --brand-2: #0369a1;
+            --line: #cbd5e1;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            background:
+                radial-gradient(circle at 15% 10%, rgba(14, 116, 144, 0.12), transparent 32%),
+                radial-gradient(circle at 90% 20%, rgba(3, 105, 161, 0.12), transparent 28%),
+                var(--bg);
+            color: var(--ink);
+        }
+
+        .container {
+            max-width: 1050px;
+            margin: 36px auto;
+            padding: 0 18px 32px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, #0e7490, #0369a1);
+            color: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 16px 40px rgba(2, 132, 199, 0.25);
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: 30px;
+        }
+
+        .hero p {
+            margin: 0;
+            line-height: 1.5;
+            max-width: 760px;
+            color: rgba(255,255,255,0.95);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-top: 18px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 18px;
+        }
+
+        .card h2 {
+            margin: 0 0 8px;
+            font-size: 20px;
+        }
+
+        .card p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .links {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            text-decoration: none;
+            border-radius: 8px;
+            padding: 9px 12px;
+            border: 1px solid var(--brand);
+            color: var(--brand);
+            font-weight: 600;
+            transition: all .2s ease;
+        }
+
+        .btn:hover {
+            background: var(--brand);
+            color: #fff;
+        }
+
+        .table-wrap {
+            margin-top: 18px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f1f5f9;
+            color: #0f172a;
+            font-weight: 700;
+        }
+
+        .method {
+            font-weight: 700;
+            color: #0c4a6e;
+        }
+
+        .foot {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <section class="hero">
+            <h1>{{ app_title }}</h1>
+            <p>
+                Este sistema sincroniza mensajes desde Evolution API de forma incremental y paginada,
+                los normaliza con Pandas y los guarda en PostgreSQL evitando duplicados por external_id.
+                Usa IngestionControl para recordar el ultimo timestamp sincronizado por instancia.
+            </p>
+        </section>
+
+        <section class="grid">
+            <article class="card">
+                <h2>Flujo Principal</h2>
+                <p>
+                    1) Start sync desde UI o API. 2) Proceso asincrono por job_id.
+                    3) Consulta paginada a Evolution. 4) Deduplicacion e insercion masiva.
+                    5) Actualizacion de cursor incremental.
+                </p>
+            </article>
+            <article class="card">
+                <h2>Navegacion Rapida</h2>
+                <p>Accesos directos de operacion y administracion.</p>
+                <div class="links">
+                    <a class="btn" href="/ingesta/sync/">Pantalla de Sync</a>
+                    <a class="btn" href="/ingesta/crm/">Dashboard CRM</a>
+                    <a class="btn" href="/api/docs/">Docs REST JSON</a>
+                    <a class="btn" href="/admin/">Admin Django</a>
+                </div>
+            </article>
+        </section>
+
+        <section class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metodo</th>
+                        <th>Endpoint</th>
+                        <th>Descripcion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ep in endpoints %}
+                    <tr>
+                        <td class="method">{{ ep.method }}</td>
+                        <td>{{ ep.path }}</td>
+                        <td>{{ ep.description }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+
+        <p class="foot">
+            Consejo: para ejecucion via API, primero llama POST /ingesta/api/sync/ y luego consulta el progreso con
+            GET /ingesta/api/sync/&lt;job_id&gt;/status/.
+        </p>
+    </main>
+</body>
+</html>

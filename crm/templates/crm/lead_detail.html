@@ -1,0 +1,174 @@
+<!-- crm/templates/crm/lead_detail.html -->
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tenant.name }} | Lead {{ lead.id }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --bg: #0a0f1e; --panel: #111827; --line: #1f2937; --text: #e5e7eb; --muted: #94a3b8; --accent: #FF9933; --success: #10b981; --danger: #ef4444; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        .shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+        .cardx { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 1.25rem; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
+        .eyebrow { color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
+        .muted { color: var(--muted); }
+        .pill { display:inline-block; padding:.25rem .7rem; border-radius:999px; background: rgba(255,153,51,.15); color: #ffbf75; font-size:.8rem; }
+        .timeline-item { border-left: 2px solid var(--line); padding-left: 1rem; margin-left: .4rem; margin-bottom: 1rem; }
+        .timeline-item::before { content:''; width:10px; height:10px; border-radius:50%; background: var(--accent); display:inline-block; margin-left:-1.45rem; margin-right:.6rem; }
+        .stage-node { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; }
+        .trace-bar { display: flex; align-items: center; margin: 1rem 0; }
+        .trace-step { display: flex; align-items: center; }
+        .trace-line { width: 30px; height: 2px; background: var(--line); }
+        .trace-active { background: var(--accent) !important; }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="mb-3">
+            <a href="/crm/{{ tenant.slug }}/dashboard/" class="text-decoration-none">&larr; Volver al dashboard</a>
+        </div>
+
+        <!-- Encabezado del Lead -->
+        <section class="cardx mb-4">
+            <div class="eyebrow mb-2">Detalle de lead</div>
+            <h1 class="h3 mb-2">{{ lead.contact.full_name }}</h1>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <span class="pill">{{ lead.current_stage }}</span>
+                {% if lead.is_closed %}<span class="pill">{{ lead.closed_result|default:"closed" }}</span>{% endif %}
+            </div>
+            <p class="mb-1"><strong>Teléfono:</strong> {{ lead.contact.phone_number }}</p>
+            <p class="mb-1"><strong>Email:</strong> {{ lead.contact.email|default:"Sin email" }}</p>
+            <p class="mb-1"><strong>Producto:</strong> {{ lead.product_of_interest|default:"Sin producto" }}</p>
+            <p class="mb-0"><strong>Categoría:</strong> {{ lead.product_category|default:"Sin categoría" }}</p>
+        </section>
+
+        <!-- Panel de Cambio de Etapa y Notas -->
+        <section class="row g-4 mb-4">
+            <div class="col-md-6">
+                <div class="cardx">
+                    <div class="eyebrow mb-3">Cambiar Etapa</div>
+                    <select id="stage-select" class="form-select mb-3">
+                        {% for stage in pipeline.stages %}
+                            <option value="{{ stage.name }}" {% if stage.name == lead.current_stage %}selected{% endif %}>{{ stage.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button onclick="updateStage()" class="btn btn-primary w-100">Actualizar Etapa</button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="cardx">
+                    <div class="eyebrow mb-3">Agregar Nota</div>
+                    <textarea id="note-text" class="form-control mb-3" rows="3" placeholder="Escribe una nota..."></textarea>
+                    <button onclick="addNote()" class="btn btn-outline-primary w-100">Guardar Nota</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Resumen IA y Actividades -->
+        <section class="row g-4">
+            <div class="col-lg-7">
+                <div class="cardx mb-4">
+                    <div class="eyebrow mb-3">Resumen IA</div>
+                    {% if summary %}
+                        <p class="mb-2"><strong>{{ summary.summary_date }}</strong></p>
+                        <p class="mb-0">{{ summary.text|default:"Sin texto disponible." }}</p>
+                    {% else %}
+                        <p class="muted mb-0">No hay resumen IA disponible para este contacto.</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Trazabilidad visual -->
+                <div class="cardx">
+                    <div class="eyebrow mb-3">Trazabilidad de Etapas</div>
+                    <div id="trace-bar" class="trace-bar"></div>
+                </div>
+            </div>
+            
+            <div class="col-lg-5">
+                <div class="cardx">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="eyebrow mb-0">Actividad</div>
+                        <button onclick="addActivity()" class="btn btn-sm btn-outline-light">+ Agregar</button>
+                    </div>
+                    <div id="activity-list">
+                        {% for activity in lead.activities.all %}
+                            <div class="timeline-item">
+                                <div><strong>{{ activity.activity_type }}</strong></div>
+                                <div class="muted small">{{ activity.created_at }}</div>
+                                <div>{{ activity.description }}</div>
+                            </div>
+                        {% empty %}
+                            <p class="muted mb-0">Todavía no hay actividades registradas.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const leadId = {{ lead.id }};
+        const tenantSlug = "{{ tenant.slug }}";
+        const apiUrl = `/api/crm/leads/${leadId}/?tenant_slug=${tenantSlug}`;
+
+        async function apiCall(url, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                },
+            };
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                alert('Error en la solicitud: ' + response.statusText);
+                return null;
+            }
+            return response.json();
+        }
+
+        async function updateStage() {
+            const newStage = document.getElementById('stage-select').value;
+            await apiCall(apiUrl, 'PATCH', { current_stage: newStage });
+            location.reload();
+        }
+
+        async function addNote() {
+            const note = document.getElementById('note-text').value.trim();
+            if (!note) return alert('Escribe una nota.');
+            await apiCall(apiUrl + 'add_note/', 'POST', { note });
+            location.reload();
+        }
+
+        async function addActivity() {
+            const desc = prompt('Describe la actividad:');
+            if (!desc) return;
+            await apiCall(apiUrl + 'add_activity/', 'POST', { description: desc });
+            location.reload();
+        }
+
+        // Build trace bar
+        async function buildTraceBar() {
+            const traceBar = document.getElementById('trace-bar');
+            try {
+                const data = await apiCall(apiUrl + 'activity/');
+                if (!data || !data.activities) return;
+                const activities = data.activities;
+                const stages = activities
+                    .filter(a => a.activity_type === 'stage_change')
+                    .map(a => a.description.replace('Etapa cambiada a ', ''));
+                stages.push("{{ lead.current_stage }}"); // current stage
+                const uniqueStages = [...new Set(stages)];
+                traceBar.innerHTML = uniqueStages.map((stage, i) => {
+                    const activeClass = stage === "{{ lead.current_stage }}" ? 'trace-active' : '';
+                    return `<div class="trace-step"><span class="stage-node ${activeClass}"></span>${stage}</div>${i < uniqueStages.length-1 ? '<div class="trace-line"></div>' : ''}`;
+                }).join('');
+            } catch(e) {}
+        }
+        buildTraceBar();
+    </script>
+</body>
+</html>

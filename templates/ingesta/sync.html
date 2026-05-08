@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sincronizacion WhatsApp</title>
+    <style>
+        body { font-family: "Segoe UI", Tahoma, sans-serif; background: #f4f7fb; margin: 0; }
+        .wrap { max-width: 820px; margin: 48px auto; background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 14px 34px rgba(8, 32, 58, 0.08); }
+        h1 { margin-top: 0; color: #12355b; }
+        label { display: block; font-weight: 600; margin-bottom: 8px; }
+        input, select { width: 100%; padding: 10px 12px; border: 1px solid #c5d3e2; border-radius: 8px; margin-bottom: 14px; box-sizing: border-box; }
+        button { background: #0e7490; color: #fff; border: none; padding: 11px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        button:disabled { opacity: 0.65; cursor: not-allowed; }
+        .status { margin: 16px 0 8px; font-weight: 600; color: #0f172a; }
+        .progress { width: 100%; height: 16px; border-radius: 999px; background: #dbeafe; overflow: hidden; border: 1px solid #bfdbfe; }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #0284c7, #0e7490); transition: width .25s ease; }
+        .small { color: #475569; font-size: 13px; margin-top: 6px; }
+        pre { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 14px; overflow-x: auto; }
+        .error-message { color: #dc2626; padding: 10px; background: #fee2e2; border-radius: 8px; margin-bottom: 14px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Panel de Ingesta</h1>
+        <p>Presiona el boton para sincronizar mensajes nuevos desde Evolution API.</p>
+
+        <div class="error-message" id="error-message"></div>
+
+        <label for="instance">Instancia de Evolution</label>
+        <select id="instance" required>
+            <option value="">Cargando instancias...</option>
+        </select>
+
+        <label for="team-user-id">Usuario del equipo (ID destino briefing, opcional)</label>
+        <input id="team-user-id" type="number" min="1" placeholder="Deja vacío para usar fallback automático" />
+
+        <button id="sync-btn" type="button">Sincronizar WhatsApp</button>
+        <button id="summary-btn" type="button" style="background: #7c3aed; margin-left: 8px;" disabled>Generar Resúmenes IA (hoy + 24h más atrás)</button>
+        <button id="audio-briefing-btn" type="button" style="background: #ea580c; margin-left: 8px;" disabled>Generar Audio Briefing Manual</button>
+
+        <div class="status" id="status-text">Estado: listo</div>
+        <div class="progress" aria-label="Progreso de descarga">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="small" id="progress-meta">0%</div>
+
+        <h2>Log de progreso</h2>
+        <pre id="log">Esperando inicio manual...</pre>
+
+        <h2>Resultado</h2>
+        <pre id="result">Listo para sincronizar...</pre>
+    </div>
+
+    <script>
+        const btn = document.getElementById("sync-btn");
+        const summaryBtn = document.getElementById("summary-btn");
+        const audioBriefingBtn = document.getElementById("audio-briefing-btn");
+        const teamUserIdInput = document.getElementById("team-user-id");
+        const result = document.getElementById("result");
+        const logBox = document.getElementById("log");
+        const statusText = document.getElementById("status-text");
+        const progressBar = document.getElementById("progress-bar");
+        const progressMeta = document.getElementById("progress-meta");
+        const instanceSelect = document.getElementById("instance");
+        const errorMessage = document.getElementById("error-message");
+
+        let activePoll = null;
+        let lastSyncSuccess = false;
+        let lastProgressSnapshot = "";
+
+        // Cargar instancias al iniciar
+        async function loadInstances() {
+            try {
+                const response = await fetch("/ingesta/api/instances/");
+                const instances = await response.json();
+                
+                if (!instances || instances.length === 0) {
+                    showError("No hay instancias de Evolution configuradas.");
+                    btn.disabled = true;
+                    return;
+                }
+
+                instanceSelect.innerHTML = "";
+                instances.forEach(inst => {
+                    const option = document.createElement("option");
+                    option.value = inst.instance_name;
+                    option.textContent = `${inst.instance_name} ${inst.description ? ' - ' + inst.description : ''}`;
+                    instanceSelect.appendChild(option);
+                });
+
+                instanceSelect.disabled = false;
+                if (instances.length > 0) {
+                    instanceSelect.value = instances[0].instance_name;
+                }
+            } catch (error) {
+                showError(`Error cargando instancias: ${error.message}`);
+                btn.disabled = true;
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = "block";
+        }
+
+        function hideError() {
+            errorMessage.style.display = "none";
+        }
+
+        function setProgress(progress, message) {
+            const safeProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+            progressBar.style.width = `${safeProgress}%`;
+            progressMeta.textContent = `${safeProgress}%`;
+            if (message) {
+                statusText.textContent = `Estado: ${message}`;
+                const snapshot = `${safeProgress}|${message}`;
+                if (snapshot !== lastProgressSnapshot) {
+                    lastProgressSnapshot = snapshot;
+                    logBox.textContent += `\n[${new Date().toLocaleTimeString()}] ${safeProgress}% - ${message}`;
+                    logBox.scrollTop = logBox.scrollHeight;
+                }
+            }
+        }
+
+        async function pollStatus(jobId) {
+            if (activePoll) {
+                clearInterval(activePoll);
+            }
+
+            activePoll = setInterval(async () => {
+                try {
+                    const response = await fetch(`/ingesta/api/sync/${jobId}/status/`);
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || "No se pudo leer progreso");
+                    }
+
+                    setProgress(data.progress, data.message || data.status);
+
+                    if (data.status === "completed") {
+                        clearInterval(activePoll);
+                        activePoll = null;
+                        btn.disabled = false;
+                        if (data.type === "summary") {
+                            summaryBtn.disabled = false;
+                            audioBriefingBtn.disabled = false;
+                        } else if (data.type === "audio_briefing") {
+                            summaryBtn.disabled = false;
+                            audioBriefingBtn.disabled = false;
+                        } else {
+                            summaryBtn.disabled = false;
+                        }
+                        lastSyncSuccess = true;
+                        result.textContent = JSON.stringify(data.result || {}, null, 2);
+
+                        if (data.type === "audio_briefing") {
+                            const downloadUrl = data.result && data.result.audio_download_url;
+                            const selectedUser = data.result && data.result.selected_team_user;
+                            if (selectedUser && selectedUser.display_label) {
+                                logBox.textContent += `\n[Audio briefing generado para: ${selectedUser.display_label} (ID ${selectedUser.id})]`;
+                            }
+                            if (downloadUrl) {
+                                logBox.textContent += `\n[Descargando audio local: ${downloadUrl}]`;
+                                const a = document.createElement("a");
+                                a.href = downloadUrl;
+                                a.download = "briefing.wav";
+                                a.rel = "noopener";
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                            }
+                        }
+                    }
+
+                    if (data.status === "failed") {
+                        clearInterval(activePoll);
+                        activePoll = null;
+                        btn.disabled = false;
+                        if (data.type === "summary") {
+                            summaryBtn.disabled = false;
+                            audioBriefingBtn.disabled = true;
+                        } else if (data.type === "audio_briefing") {
+                            summaryBtn.disabled = false;
+                            audioBriefingBtn.disabled = false;
+                        } else {
+                            summaryBtn.disabled = true;
+                            audioBriefingBtn.disabled = true;
+                        }
+                        lastSyncSuccess = false;
+                        const detail = data.traceback
+                            ? `\n\nTraceback:\n${data.traceback}`
+                            : "";
+                        result.textContent = `Fallo de sincronizacion: ${data.error || "Error desconocido"}${detail}`;
+                    }
+                } catch (error) {
+                    clearInterval(activePoll);
+                    activePoll = null;
+                    btn.disabled = false;
+                    result.textContent = `Error consultando progreso: ${error.message}`;
+                }
+            }, 1000);
+        }
+
+        btn.addEventListener("click", async () => {
+            hideError();
+            btn.disabled = true;
+            result.textContent = "Procesando...";
+            logBox.textContent = "Inicio manual ejecutado.";
+            lastProgressSnapshot = "";
+            audioBriefingBtn.disabled = true;
+            setProgress(0, "Creando tarea");
+            try {
+                const instanceName = instanceSelect.value;
+                if (!instanceName) {
+                    showError("Por favor selecciona una instancia.");
+                    btn.disabled = false;
+                    return;
+                }
+
+                const response = await fetch("/ingesta/api/sync/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ instance_name: instanceName })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || "Error al sincronizar");
+                }
+                setProgress(data.progress, data.message || "Tarea en cola");
+                result.textContent = "Descargando y procesando mensajes...";
+                await pollStatus(data.job_id);
+            } catch (error) {
+                result.textContent = `Fallo de sincronizacion: ${error.message}`;
+                btn.disabled = false;
+            }
+        });
+
+        summaryBtn.addEventListener("click", async () => {
+            hideError();
+            summaryBtn.disabled = true;
+            btn.disabled = true;
+            audioBriefingBtn.disabled = true;
+            result.textContent = "Procesando resúmenes IA...";
+            logBox.textContent += "\n[Resúmenes IA iniciados]";
+            lastProgressSnapshot = "";
+            setProgress(10, "Generando resúmenes: hoy + 24h más atrás");
+            try {
+                const response = await fetch("/ingesta/api/summary/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ lookback_hours: 12, force: false, accumulate: true })
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || "Error al generar resúmenes");
+                }
+                setProgress(data.progress, data.message || "Tarea en cola");
+                await pollStatus(data.job_id);
+            } catch (error) {
+                result.textContent = `Fallo de resúmenes IA: ${error.message}`;
+                summaryBtn.disabled = false;
+                btn.disabled = false;
+            }
+        });
+
+        audioBriefingBtn.addEventListener("click", async () => {
+            hideError();
+            audioBriefingBtn.disabled = true;
+            summaryBtn.disabled = true;
+            btn.disabled = true;
+            result.textContent = "Generando audio briefing...";
+            logBox.textContent += "\n[Audio briefing manual iniciado]";
+            lastProgressSnapshot = "";
+            setProgress(10, "Generando audio briefing ejecutivo");
+
+            try {
+                const instanceName = instanceSelect.value;
+                const teamUserId = Number(teamUserIdInput.value || 0);
+                if (!instanceName) {
+                    showError("Por favor selecciona una instancia.");
+                    audioBriefingBtn.disabled = false;
+                    summaryBtn.disabled = false;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const payload = {
+                    instance_name: instanceName,
+                    team_user_id: teamUserId > 0 ? teamUserId : null,
+                };
+                const response = await fetch("/ingesta/api/audio-briefing/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || "Error al generar audio briefing");
+                }
+                setProgress(data.progress, data.message || "Tarea en cola");
+                await pollStatus(data.job_id);
+            } catch (error) {
+                result.textContent = `Fallo de audio briefing: ${error.message}`;
+                audioBriefingBtn.disabled = false;
+                summaryBtn.disabled = false;
+                btn.disabled = false;
+            }
+        });
+
+        // Cargar instancias cuando la página se cargue
+        document.addEventListener("DOMContentLoaded", loadInstances);
+    </script>
+</body>
+</html>

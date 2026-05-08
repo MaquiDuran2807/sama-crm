@@ -1,0 +1,11 @@
+django
+djangorestframework
+pandas
+numpy
+python-dotenv
+psycopg2-binary
+requests
+openpyxl
+piper-tts
+pydub
+soundfile

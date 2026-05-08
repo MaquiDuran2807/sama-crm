@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAMA AdTech — Diagrama ER Detallado (4 columnas)</title>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0f1e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            color: #ff9933;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 2.2rem;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        #network {
+            width: 100%;
+            max-width: 1500px;
+            height: 900px;
+            border: 1px solid #1a2030;
+            border-radius: 10px;
+            background: #0d1117;
+        }
+        .legend {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+            padding: 15px;
+            background: #111827;
+            border-radius: 8px;
+            border: 1px solid #1e293b;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        .legend-line {
+            width: 30px;
+            height: 2px;
+            border-radius: 1px;
+        }
+        .info {
+            margin-top: 15px;
+            color: #888;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>SAMA AdTech — Diagrama Entidad-Relación Detallado</h1>
+    <p class="subtitle">Apps <strong>tenants</strong>, <strong>crm</strong> e <strong>ingesta</strong> · Disposición en 4 columnas</p>
+    <div id="network"></div>
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background:#3b82f6;"></div> tenants</div>
+        <div class="legend-item"><div class="legend-color" style="background:#f97316;"></div> crm</div>
+        <div class="legend-item"><div class="legend-color" style="background:#8b5cf6;"></div> ingesta (existente)</div>
+        <div class="legend-item"><span style="color:#4ade80; font-weight:bold;">—— 1:N</span></div>
+        <div class="legend-item"><span style="color:#facc15; font-weight:bold;">---- 1:1</span></div>
+        <div class="legend-item"><span style="color:#ef4444; font-weight:bold;">---- autoref</span></div>
+        <div class="legend-item"><span style="background:#1e3a5f; color:white; padding:2px 6px; border-radius:4px;">PK</span> Clave primaria</div>
+        <div class="legend-item"><span style="background:#5c3a1e; color:white; padding:2px 6px; border-radius:4px;">FK</span> Clave foránea</div>
+        <div class="legend-item"><span style="background:#4a2a6a; color:white; padding:2px 6px; border-radius:4px;">JSON</span> JSONField</div>
+    </div>
+    <p class="info">Puedes arrastrar los nodos libremente en cualquier dirección. Los colores de las tarjetas identifican cada app.</p>
+
+    <script>
+        const nodes = new vis.DataSet([
+            // ===== COLUMNA 1: TENANTS (principal) =====
+            { id: 1, label: 'Tenant\n─────────────────\n🟦 id (PK)\nname\nslug\nis_active\n🟪 blueprint (JSON)\ntier\nperiod\nsubscription_start\nsubscription_end\nauto_renew\ncreated_at\nupdated_at',
+              group: 'tenants', x: -600, y: 0, shape: 'box', margin: { top: 15, bottom: 15, left: 25, right: 25 } },
+
+            // ===== COLUMNA 2: TENANTS (detalle) =====
+            { id: 2, label: 'TenantModule\n─────────────────\n🟦 id (PK)\n🟧 tenant (FK → Tenant)\nmodule_key\ndisplay_name\nis_active\n🟪 config (JSON)\ncreated_at',
+              group: 'tenants', x: -200, y: -250, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+            { id: 3, label: 'PipelineConfig\n─────────────────\n🟦 id (PK)\n🟧 tenant (FK 1:1 → Tenant)\n🟪 stages (JSON)\nallow_skip_stages',
+              group: 'tenants', x: -200, y: 0, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+            { id: 4, label: 'CustomField\n─────────────────\n🟦 id (PK)\n🟧 tenant (FK → Tenant)\ntarget_model\nfield_name\nfield_type\n🟪 options (JSON)\nis_required\norder',
+              group: 'tenants', x: -200, y: 250, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+
+            // ===== COLUMNA 3: CRM (principal) =====
+            { id: 5, label: 'Contact\n─────────────────\n🟦 id (PK)\n🟧 tenant (FK → Tenant)\nfull_name\nphone_number\nemail\naddress\ncity\nutm_source\nutm_medium\nutm_campaign\n🟧 referrer_contact (FK auto)\n🟪 custom_fields (JSON)\ncreated_at\nupdated_at',
+              group: 'crm', x: 300, y: -200, shape: 'box', margin: { top: 15, bottom: 15, left: 25, right: 25 } },
+            { id: 6, label: 'Lead\n─────────────────\n🟦 id (PK)\n🟧 tenant (FK → Tenant)\n🟧 contact (FK → Contact)\ncurrent_stage\nproduct_of_interest\nproduct_category\nnotes\n🟪 skipped_stages (JSON)\nis_closed\nclosed_result\n🟪 custom_fields (JSON)\ncreated_at\nupdated_at\nlast_contacted_at',
+              group: 'crm', x: 300, y: 200, shape: 'box', margin: { top: 15, bottom: 15, left: 25, right: 25 } },
+
+            // ===== COLUMNA 4: DETALLE CRM + INGESTA =====
+            { id: 7, label: 'LeadSource\n─────────────────\n🟦 id (PK)\n🟧 lead (FK 1:1 → Lead)\nplatform\nutm_source\nutm_medium\nutm_campaign\n🟧 referrer_contact (FK auto)\nlanding_page_url\ncreated_at',
+              group: 'crm', x: 750, y: 50, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+            { id: 8, label: 'LeadActivity\n─────────────────\n🟦 id (PK)\n🟧 lead (FK → Lead)\nactivity_type\ndescription\nperformed_by\ncreated_at',
+              group: 'crm', x: 750, y: 250, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+            { id: 9, label: 'ChatUser\n(ingesta)\n─────────────────\n🟦 id (PK)\nwa_id\nname\nphone_number\nlast_interaction',
+              group: 'ingesta', x: 750, y: -250, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+            { id: 10, label: 'DailyTextSummary\n(ingesta)\n─────────────────\n🟦 id (PK)\n🟧 user (FK → ChatUser)\nsummary_date\ntext\n🟪 pending_items (JSON)\n🟪 deadlines (JSON)\n🟪 payment_promises (JSON)\ncreated_at',
+              group: 'ingesta', x: 750, y: -450, shape: 'box', margin: { top: 10, bottom: 10, left: 15, right: 15 } },
+        ]);
+
+        const edges = new vis.DataSet([
+            // Tenant → TenantModule (1:N)
+            { from: 1, to: 2, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Tenant → PipelineConfig (1:1)
+            { from: 1, to: 3, label: '1:1', color: { color: '#facc15', opacity: 1 }, width: 2, dashes: true, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Tenant → CustomField (1:N)
+            { from: 1, to: 4, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Tenant → Contact (1:N)
+            { from: 1, to: 5, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Tenant → Lead (1:N)
+            { from: 1, to: 6, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Contact → Lead (1:N)
+            { from: 5, to: 6, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Lead → LeadSource (1:1)
+            { from: 6, to: 7, label: '1:1', color: { color: '#facc15', opacity: 1 }, width: 2, dashes: true, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Lead → LeadActivity (1:N)
+            { from: 6, to: 8, label: '1:N', color: { color: '#4ade80', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // Contact autoreferencia
+            { from: 5, to: 5, label: 'referrer_contact', color: { color: '#ef4444', opacity: 1 }, width: 2, dashes: true, arrows: { to: { enabled: true, scaleFactor: 0.5 } }, selfReference: { size: 40, angle: Math.PI / 4 } },
+            // LeadSource → Contact (referido)
+            { from: 7, to: 5, label: 'referrer_contact', color: { color: '#ef4444', opacity: 1 }, width: 2, dashes: true, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // ChatUser → Contact (1:1 opcional)
+            { from: 9, to: 5, label: '1:1 (opc)', color: { color: '#a78bfa', opacity: 1 }, width: 2, dashes: true, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+            // ChatUser → DailyTextSummary (1:N)
+            { from: 9, to: 10, label: '1:N', color: { color: '#a78bfa', opacity: 1 }, width: 2, arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.2 } },
+        ]);
+
+        const container = document.getElementById('network');
+        const data = { nodes: nodes, edges: edges };
+        const options = {
+            groups: {
+                tenants: { color: { background: '#1e3a5f', border: '#3b82f6' }, shape: 'box', font: { color: '#fff', size: 11, face: 'Consolas' } },
+                crm: { color: { background: '#3d2a0f', border: '#f97316' }, shape: 'box', font: { color: '#fff', size: 11, face: 'Consolas' } },
+                ingesta: { color: { background: '#2e1a4a', border: '#8b5cf6' }, shape: 'box', font: { color: '#fff', size: 11, face: 'Consolas' } },
+            },
+            physics: { enabled: false },
+            interaction: { hover: true, tooltipDelay: 100, dragNodes: true, dragView: true, zoomView: true },
+            edges: { smooth: { type: 'curvedCW', roundness: 0.3 } },
+        };
+        const network = new vis.Network(container, data, options);
+    </script>
+</body>
+</html>

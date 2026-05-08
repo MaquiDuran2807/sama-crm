@@ -1,0 +1,116 @@
+{% extends "crm/base.html" %}
+{% load static %}
+
+{% block title %}{{ tenant.name }} | Pipeline de Ventas | SAMA AdTech{% endblock %}
+{% block meta_description %}Dashboard Kanban del CRM de SAMA AdTech. Gestiona tus leads y pipeline de ventas de forma visual e inteligente.{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<section class="stats-row" aria-label="Metricas del pipeline">
+    <article class="stat-card total" aria-labelledby="stat-total">
+        <div class="stat-icon total"><i class="bi bi-inbox"></i></div>
+        <div>
+            <div class="stat-value" id="stat-total">{{ stats.total_leads|default:"0" }}</div>
+            <div class="stat-label">Total Leads</div>
+        </div>
+    </article>
+    <article class="stat-card new" aria-labelledby="stat-new">
+        <div class="stat-icon new"><i class="bi bi-lightning-charge"></i></div>
+        <div>
+            <div class="stat-value" id="stat-new">{{ stats.leads_nuevos_hoy|default:"0" }}</div>
+            <div class="stat-label">Nuevos Hoy</div>
+        </div>
+    </article>
+    <article class="stat-card active" aria-labelledby="stat-active">
+        <div class="stat-icon active"><i class="bi bi-graph-up"></i></div>
+        <div>
+            <div class="stat-value" id="stat-active">{{ stats.active_leads|default:"0" }}</div>
+            <div class="stat-label">En Proceso</div>
+        </div>
+    </article>
+    <article class="stat-card closed" aria-labelledby="stat-closed">
+        <div class="stat-icon closed"><i class="bi bi-trophy"></i></div>
+        <div>
+            <div class="stat-value" id="stat-closed">{{ stats.won_leads|default:"0" }}</div>
+            <div class="stat-label">Cerrados Ganados</div>
+        </div>
+    </article>
+</section>
+
+<div class="search-container" role="search">
+    <i class="bi bi-search search-icon" aria-hidden="true"></i>
+    <input
+        type="search"
+        id="lead-search"
+        class="search-input"
+        placeholder="Buscar por nombre, telefono o producto..."
+        aria-label="Buscar leads"
+        autocomplete="off"
+    >
+    <button class="search-clear" id="search-clear" aria-label="Limpiar busqueda" style="display:none;">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
+<section class="kanban-container" id="kanban-board" aria-label="Tablero Kanban del pipeline">
+    {% for stage in pipeline %}
+    <div class="kanban-column" data-stage="{{ stage.name }}" data-stage-color="{{ stage.color|default:'#64748b' }}" role="region" aria-label="Etapa {{ stage.name }}">
+        <header class="kanban-column-header">
+            <span class="kanban-stage-name">
+                <span class="kanban-stage-dot" style="background-color: {{ stage.color|default:'#64748b' }};" aria-hidden="true"></span>
+                {{ stage.name }}
+            </span>
+            <span class="kanban-stage-count" aria-label="{{ stage.lead_count }} leads">{{ stage.lead_count|default:"0" }}</span>
+        </header>
+        <div class="kanban-cards">
+            {% for lead in stage.leads %}
+            <a href="/crm/{{ tenant.slug }}/leads/{{ lead.id }}/"
+               class="lead-card"
+               draggable="true"
+               data-lead-id="{{ lead.id }}"
+               data-stage-color="{{ stage.color|default:'#64748b' }}"
+               data-name="{{ lead.contact.full_name|lower }}"
+               data-phone="{{ lead.contact.phone_number }}"
+               data-product="{{ lead.product_of_interest|lower }}"
+               style="--stage-color: {{ stage.color|default:'#64748b' }};"
+               aria-label="Lead {{ lead.contact.full_name }}, {{ lead.product_of_interest }}">
+                <div class="lead-card-header">
+                    <span class="lead-card-name">{{ lead.contact.full_name }}</span>
+                    <span class="lead-card-phone">{{ lead.contact.phone_number }}</span>
+                </div>
+                <div class="lead-card-product">
+                    <i class="bi bi-box-seam me-1"></i>{{ lead.product_of_interest|default:"Sin producto" }}
+                </div>
+                <div class="lead-card-footer">
+                    <span class="lead-card-time">
+                        <i class="bi bi-clock"></i>
+                        {{ lead.time_since_update|default:"Sin actividad" }}
+                    </span>
+                    {% if lead.is_new %}
+                    <span class="lead-card-badge badge-hot">Nuevo</span>
+                    {% endif %}
+                </div>
+            </a>
+            {% empty %}
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>Sin leads en esta etapa</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="empty-state" style="width:100%;">
+        <i class="bi bi-kanban"></i>
+        <p>No hay etapas configuradas en el pipeline.</p>
+    </div>
+    {% endfor %}
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'crm/js/dashboard.js' %}"></script>
+{% endblock %}
