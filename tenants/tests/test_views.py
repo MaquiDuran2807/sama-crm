@@ -5,6 +5,7 @@ devolviendo la estructura esperada para lista, detalle y acciones auxiliares
 del pipeline, modulos y campos personalizados.
 """
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -18,6 +19,10 @@ class TenantAPITestCase(TestCase):
         """Prepara un tenant base con pipeline, modulo y campo personalizado."""
 
         self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
         self.tenant = Tenant.objects.create(
             name="Codensolar SAS",
             slug="codensolar",

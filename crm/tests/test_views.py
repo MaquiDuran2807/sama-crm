@@ -5,6 +5,7 @@ resumenes IA, ademas de las vistas HTML del dashboard Kanban y el detalle de
 lead del CRM, validando el comportamiento observable de la capa de interfaces.
 """
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -21,6 +22,10 @@ class CRMAPITestCase(TestCase):
         """Construye un tenant y un contacto minimo para las pruebas."""
 
         self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
         self.tenant = Tenant.objects.create(
             name="Codensolar SAS", slug="codensolar", is_active=True
         )
@@ -79,6 +84,15 @@ class CRMAPITestCase(TestCase):
     def test_stage_change_creates_activity(self):
         """Valida que un cambio de etapa registre actividad en el historial."""
 
+        PipelineConfig.objects.create(
+            tenant=self.tenant,
+            stages=[
+                {"name": "Lead", "color": "#003366", "order": 1},
+                {"name": "Cotización Enviada", "color": "#FF9933", "order": 2},
+                {"name": "Cerrado Ganado", "color": "#00CC66", "order": 3},
+            ],
+            allow_skip_stages=True,
+        )
         lead = Lead.objects.create(
             tenant=self.tenant, contact=self.contact, current_stage="Lead"
         )
@@ -91,6 +105,32 @@ class CRMAPITestCase(TestCase):
         lead.refresh_from_db()
         self.assertEqual(lead.current_stage, "Cotización Enviada")
         self.assertTrue(lead.activities.filter(activity_type="stage_change").exists())
+        self.assertFalse(lead.is_closed)  # No es la última etapa, no se cierra
+
+    def test_stage_change_to_last_closes_lead(self):
+        """Valida que al llegar a la última etapa el lead se cierre como won."""
+
+        PipelineConfig.objects.create(
+            tenant=self.tenant,
+            stages=[
+                {"name": "Lead", "color": "#003366", "order": 1},
+                {"name": "Cerrado Ganado", "color": "#00CC66", "order": 2},
+            ],
+            allow_skip_stages=True,
+        )
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        response = self.client.patch(
+            f"/api/crm/leads/{lead.id}/?tenant_slug=codensolar",
+            {"current_stage": "Cerrado Ganado"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        lead.refresh_from_db()
+        self.assertEqual(lead.current_stage, "Cerrado Ganado")
+        self.assertTrue(lead.is_closed)
+        self.assertEqual(lead.closed_result, "won")
 
     def test_stats_endpoint(self):
         """Valida que el endpoint de estadisticas agregue el pipeline completo."""
@@ -115,6 +155,64 @@ class CRMAPITestCase(TestCase):
         response = self.client.get(f"/api/crm/leads/{lead.id}/summary/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_add_note_endpoint(self):
+        """Valida que add_note cree una actividad tipo nota."""
+
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        response = self.client.post(
+            f"/api/crm/leads/{lead.id}/add_note/?tenant_slug=codensolar",
+            {"note": "Cliente interesado en paneles solares"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        activity = lead.activities.filter(activity_type="note_added").first()
+        self.assertIsNotNone(activity)
+        self.assertEqual(activity.description, "Cliente interesado en paneles solares")
+
+    def test_add_note_missing_field(self):
+        """Valida que add_note acepte nota vacía (devuelve 201)."""
+
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        response = self.client.post(
+            f"/api/crm/leads/{lead.id}/add_note/?tenant_slug=codensolar",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_add_activity_endpoint(self):
+        """Valida que add_activity cree una actividad tipo manual."""
+
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        response = self.client.post(
+            f"/api/crm/leads/{lead.id}/add_activity/?tenant_slug=codensolar",
+            {"description": "Llamada de seguimiento realizada"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        activity = lead.activities.filter(activity_type="manual").first()
+        self.assertIsNotNone(activity)
+        self.assertEqual(activity.description, "Llamada de seguimiento realizada")
+
+    def test_add_activity_missing_field(self):
+        """Valida que add_activity devuelva 400 si falta 'description'."""
+
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        response = self.client.post(
+            f"/api/crm/leads/{lead.id}/add_activity/?tenant_slug=codensolar",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_dashboard_html_renders(self):
         """Valida que el dashboard HTML de CRM renderice para un tenant."""
 
@@ -128,10 +226,15 @@ class CRMAPITestCase(TestCase):
         )
         Lead.objects.create(tenant=self.tenant, contact=self.contact, current_stage="Lead")
 
-        response = Client().get("/crm/codensolar/dashboard/")
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/dashboard/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, "Codensolar SAS")
         self.assertContains(response, "Pipeline de Ventas")
+        self.assertContains(response, "crm/css/themes.css")
+        self.assertContains(response, "bi-person-circle")
+        self.assertContains(response, "Configuración")
 
     def test_lead_detail_html_renders(self):
         """Valida que el detalle HTML de lead renderice para un lead dado."""
@@ -150,7 +253,9 @@ class CRMAPITestCase(TestCase):
             product_of_interest="Panel Solar 450W",
         )
 
-        response = Client().get(f"/crm/codensolar/leads/{lead.id}/")
+        client = Client()
+        client.force_login(self.user)
+        response = client.get(f"/crm/codensolar/leads/{lead.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, "Juan Pérez")
         self.assertContains(response, "Panel Solar 450W")

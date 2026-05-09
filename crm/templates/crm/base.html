@@ -15,6 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,200..900;1,14..32,200..900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="{% static 'crm/css/themes.css' %}" rel="stylesheet">
 
     <!-- CSS específicos de la aplicación CRM -->
     {% block extra_css %}{% endblock %}
@@ -38,14 +39,33 @@
             </div>
             <div class="header-actions">
                 {% block header_actions %}
-                <button class="btn-refresh" onclick="location.reload()" aria-label="Actualizar datos">
+                <button type="button" class="btn-refresh" onclick="location.reload()" aria-label="Actualizar datos">
                     <i class="bi bi-arrow-clockwise"></i> Actualizar
                 </button>
-                <button class="theme-toggle" id="theme-toggle" aria-label="Cambiar tema">
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Cambiar tema">
                     <i class="bi bi-sun"></i>
                 </button>
-                <div class="user-avatar" aria-label="Usuario {{ tenant.name|truncatechars:2 }}">
-                    {{ tenant.name|first|upper }}
+                <div class="dropdown">
+                    <button type="button"
+                            class="user-avatar-toggle dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            aria-label="Abrir menú de usuario {{ tenant.name }}">
+                        <span class="user-avatar-toggle-inner">{{ tenant.name.0|upper }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end crm-user-menu">
+                        <li class="crm-user-menu-header">
+                            <i class="bi bi-person-circle" aria-hidden="true"></i>
+                            <div>
+                                <strong>{{ tenant.name }}</strong>
+                                <span>Opciones de cuenta</span>
+                            </div>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" aria-disabled="true" tabindex="-1">Configuración</a></li>
+                        <li><a class="dropdown-item" href="/crm/{{ tenant.slug }}/trash/">Papelera</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item disabled" href="#" aria-disabled="true" tabindex="-1">Cerrar sesión</a></li>
+                    </ul>
                 </div>
                 {% endblock %}
             </div>
@@ -60,7 +80,7 @@
     </main>
 
     <!-- ========== FOOTER (OPCIONAL) ========== -->
-    <footer class="dashboard-footer" style="text-align: center; padding: 1rem; color: var(--color-text-muted); font-size: 0.85rem; border-top: 1px solid var(--color-card-border); margin-top: 3rem;">
+    <footer class="dashboard-footer">
         {% block footer %}
         <p>&copy; 2026 SAMA AdTech. Todos los derechos reservados.</p>
         {% endblock %}
@@ -71,5 +91,7 @@
 
     <!-- Scripts específicos de la aplicación -->
     {% block extra_js %}{% endblock %}
+
+    {% block modals %}{% endblock %}
 </body>
 </html>

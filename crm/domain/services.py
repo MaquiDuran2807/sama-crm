@@ -181,6 +181,7 @@ def auto_advance_eligible_leads(tenant: Any) -> QuerySet[Lead]:
     eligible_leads = Lead.objects.filter(
         tenant=tenant,
         is_closed=False,
+        is_deleted=False,
         last_contacted_at__lt=threshold,
     )
     advanced: list[int] = []
@@ -241,6 +242,37 @@ def _next_available_stage(
         if not stage.get("skip_allowed", False):
             return stage.get("name")
     return None
+
+
+def create_reopen_lead(original_lead: Lead, first_stage: str, performed_by: str = "system") -> Lead:
+    """Crea un nuevo lead como reapertura (recompra) de uno cerrado.
+
+    El lead original permanece intacto en su etapa cerrada. El nuevo lead
+    se crea en la primera etapa del pipeline con los datos del contacto
+    y producto del lead original.
+
+    Args:
+        original_lead: Lead cerrado del que se parte.
+        first_stage: Nombre de la primera etapa del pipeline.
+        performed_by: Usuario que ejecuta la acción.
+
+    Returns:
+        La nueva instancia de Lead creada.
+    """
+    new_lead = Lead.objects.create(
+        tenant=original_lead.tenant,
+        contact=original_lead.contact,
+        current_stage=first_stage,
+        product_of_interest=original_lead.product_of_interest,
+        product_category=original_lead.product_category,
+    )
+    LeadActivity.objects.create(
+        lead=new_lead,
+        activity_type="recompra",
+        description=f"Nueva oportunidad generada a partir de lead cerrado {original_lead.id}",
+        performed_by=performed_by,
+    )
+    return new_lead
 
 
 def get_lead_summary(lead: Lead) -> DailyTextSummary | None:
@@ -336,7 +368,7 @@ def get_leads_stats(tenant: Any) -> dict[str, Any]:
     * Si el tenant no tiene leads, todas las métricas retornarán cero o
       diccionarios vacíos.
     """
-    leads = Lead.objects.filter(tenant=tenant)
+    leads = Lead.objects.filter(tenant=tenant, is_deleted=False)
     today = timezone.localdate()
     leads_por_etapa = {
         row["current_stage"]: row["total"]

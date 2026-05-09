@@ -129,6 +129,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
 
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
+
 EVOLUTION_BASE_URL = os.getenv('EVOLUTION_BASE_URL', 'http://localhost:8080')
 EVOLUTION_API_KEY = os.getenv('EVOLUTION_API_KEY', '')
 EVOLUTION_INSTANCES_ENDPOINT = os.getenv('EVOLUTION_INSTANCES_ENDPOINT', '/instance/fetchInstances')

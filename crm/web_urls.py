@@ -7,15 +7,28 @@ backend web, no los endpoints JSON.
 
 from django.urls import path
 
-from crm.interfaces.views import CrmDashboardTemplateView, CrmLeadDetailTemplateView
+from crm.interfaces.views import (
+    CrmDashboardTemplateView,
+    CrmLeadDetailTemplateView,
+    CrmTrashTemplateView,
+)
 
 app_name = "crm_web"
 
 urlpatterns = [
-    path("<slug:tenant_slug>/dashboard/", CrmDashboardTemplateView.as_view(), name="dashboard"),
+    path(
+        "<slug:tenant_slug>/dashboard/",
+        CrmDashboardTemplateView.as_view(),
+        name="dashboard",
+    ),
     path(
         "<slug:tenant_slug>/leads/<int:lead_id>/",
         CrmLeadDetailTemplateView.as_view(),
         name="lead-detail",
+    ),
+    path(
+        "<slug:tenant_slug>/trash/",
+        CrmTrashTemplateView.as_view(),
+        name="trash",
     ),
 ]

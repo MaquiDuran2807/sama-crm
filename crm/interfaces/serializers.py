@@ -66,6 +66,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     source = LeadSourceSerializer(read_only=True)
     activities = LeadActivitySerializer(many=True, read_only=True)
+    tenant = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Lead

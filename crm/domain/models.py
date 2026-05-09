@@ -34,6 +34,26 @@ class Contact(models.Model):
         return f"{self.full_name} ({self.phone_number or self.email or 'sin contacto'})"
 
 
+class LeadManager(models.Manager):
+    """Manager que excluye leads marcados como eliminados."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class LeadQuerySet(models.QuerySet):
+    """QuerySet personalizado con métodos de consulta para leads."""
+
+    def active(self):
+        return self.filter(is_deleted=False)
+
+    def deleted(self):
+        return self.filter(is_deleted=True)
+
+    def closed(self):
+        return self.filter(is_closed=True)
+
+
 class Lead(models.Model):
     """Oportunidad de venta. Un contacto puede tener varios leads."""
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="leads")
@@ -48,15 +68,25 @@ class Lead(models.Model):
 
     custom_fields = models.JSONField(default=dict)
 
+    # ── Soft delete ──
+    is_deleted = models.BooleanField(default=False, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_by = models.CharField(max_length=100, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = LeadManager()
+    all_objects = models.Manager()
 
     class Meta:
         indexes = [
             models.Index(fields=["tenant", "current_stage"]),
             models.Index(fields=["tenant", "-created_at"]),
             models.Index(fields=["contact", "-created_at"]),
+            models.Index(fields=["is_deleted"]),
+            models.Index(fields=["deleted_at"]),
         ]
         ordering = ["-updated_at"]
 
@@ -82,6 +112,18 @@ class LeadSource(models.Model):
     landing_page_url = models.URLField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    PLATFORM_ICONS = {
+        "meta": "bi-facebook",
+        "google": "bi-google",
+        "tiktok": "bi-tiktok",
+        "web": "bi-globe",
+        "referral": "bi-person-lines-fill",
+    }
+
+    def get_icon_class(self) -> str:
+        """Retorna la clase del icono Bootstrap correspondiente a la plataforma."""
+        return self.PLATFORM_ICONS.get(self.platform, "bi-globe")
 
     def __str__(self):
         return f"Fuente de {self.lead}"

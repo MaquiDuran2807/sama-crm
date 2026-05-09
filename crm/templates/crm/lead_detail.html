@@ -1,174 +1,310 @@
-<!-- crm/templates/crm/lead_detail.html -->
+{% extends "crm/base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ tenant.name }} | Lead {{ lead.id }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        :root { --bg: #0a0f1e; --panel: #111827; --line: #1f2937; --text: #e5e7eb; --muted: #94a3b8; --accent: #FF9933; --success: #10b981; --danger: #ef4444; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-        .shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
-        .cardx { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 1.25rem; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
-        .eyebrow { color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
-        .muted { color: var(--muted); }
-        .pill { display:inline-block; padding:.25rem .7rem; border-radius:999px; background: rgba(255,153,51,.15); color: #ffbf75; font-size:.8rem; }
-        .timeline-item { border-left: 2px solid var(--line); padding-left: 1rem; margin-left: .4rem; margin-bottom: 1rem; }
-        .timeline-item::before { content:''; width:10px; height:10px; border-radius:50%; background: var(--accent); display:inline-block; margin-left:-1.45rem; margin-right:.6rem; }
-        .stage-node { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; }
-        .trace-bar { display: flex; align-items: center; margin: 1rem 0; }
-        .trace-step { display: flex; align-items: center; }
-        .trace-line { width: 30px; height: 2px; background: var(--line); }
-        .trace-active { background: var(--accent) !important; }
-    </style>
-</head>
-<body>
-    <main class="shell">
-        <div class="mb-3">
-            <a href="/crm/{{ tenant.slug }}/dashboard/" class="text-decoration-none">&larr; Volver al dashboard</a>
+
+{% block title %}{{ tenant.name }} | Lead {{ lead.id }}{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
+<style>
+    .shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+    .cardx { background: var(--color-card-bg); border: 1px solid var(--color-card-border); border-radius: 18px; padding: 1.25rem; box-shadow: var(--shadow-lg); }
+    .eyebrow { color: var(--color-accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
+    .muted { color: var(--color-text-muted); }
+    .pill { display:inline-block; padding:.25rem .7rem; border-radius:999px; background: var(--color-accent-soft); color: var(--color-accent-light); font-size:.8rem; }
+    .timeline-item { border-left: 2px solid var(--color-border); padding-left: 1rem; margin-left: .4rem; margin-bottom: 1rem; }
+    .timeline-item::before { content:''; width:10px; height:10px; border-radius:50%; background: var(--color-accent); display:inline-block; margin-left:-1.45rem; margin-right:.6rem; }
+    .stage-node { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; }
+    .trace-bar { display: flex; align-items: center; margin: 1rem 0; }
+    .trace-step { display: flex; align-items: center; }
+    .trace-line { width: 30px; height: 2px; background: var(--color-border); }
+    .trace-active { background: var(--color-accent) !important; }
+    .source-link { color: var(--color-accent); font-size: .82rem; }
+    .source-link:hover { opacity: 0.8; }
+    #lead-content { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+{{ block.super }}
+<a href="/crm/{{ tenant.slug }}/dashboard/" class="btn-refresh" aria-label="Volver al dashboard">
+    <i class="bi bi-arrow-left"></i> Volver
+</a>
+{% endblock %}
+
+{% block content %}
+<div id="lead-content">
+    <!-- Encabezado del Lead -->
+    <section class="cardx mb-4">
+        <div class="eyebrow mb-2">Detalle de lead</div>
+        <h1 class="h3 mb-2">{{ lead.contact.full_name }}</h1>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <span class="pill">{{ lead.current_stage }}</span>
+            {% if lead.is_closed %}<span class="pill">{{ lead.closed_result|default:"closed" }}</span>{% endif %}
+        </div>
+        <p class="mb-1"><strong>Teléfono:</strong> {{ lead.contact.phone_number }}</p>
+        <p class="mb-1"><strong>Email:</strong> {{ lead.contact.email|default:"Sin email" }}</p>
+        <p class="mb-1"><strong>Producto:</strong> {{ lead.product_of_interest|default:"Sin producto" }}</p>
+        <p class="mb-0"><strong>Categoría:</strong> {{ lead.product_category|default:"Sin categoría" }}</p>
+        {% if lead.source %}
+        <hr style="border-color: var(--color-card-border); margin: 1rem 0;">
+        <p class="mb-1">
+            <i class="bi {{ lead.source.get_icon_class }}"></i>
+            <strong>Origen:</strong> {{ lead.source.get_platform_display }}
+        </p>
+        {% if lead.source.utm_source %}<p class="mb-1"><strong>UTM Source:</strong> {{ lead.source.utm_source }}</p>{% endif %}
+        {% if lead.source.utm_medium %}<p class="mb-1"><strong>UTM Medium:</strong> {{ lead.source.utm_medium }}</p>{% endif %}
+        {% if lead.source.utm_campaign %}<p class="mb-1"><strong>UTM Campaign:</strong> {{ lead.source.utm_campaign }}</p>{% endif %}
+        {% if lead.source.referrer_contact %}<p class="mb-1"><strong>Referido por:</strong> {{ lead.source.referrer_contact.full_name }}</p>{% endif %}
+        {% if lead.source.landing_page_url %}<p class="mb-0"><strong>Landing page:</strong> <a href="{{ lead.source.landing_page_url }}" target="_blank" rel="noopener noreferrer" class="source-link">{{ lead.source.landing_page_url|truncatechars:60 }}</a></p>{% endif %}
+        {% else %}
+        <p class="mb-0 muted" style="font-size: .85rem;">Sin información de origen</p>
+        {% endif %}
+    </section>
+
+    <!-- Panel de Cambio de Etapa y Notas -->
+    <section class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="cardx">
+                <div class="eyebrow mb-3">Cambiar Etapa</div>
+                <select id="stage-select" class="form-select mb-3">
+                    {% for stage in pipeline_stages %}
+                        <option value="{{ stage.name }}" {% if stage.name == lead.current_stage %}selected{% endif %}>{{ stage.name }}</option>
+                    {% endfor %}
+                </select>
+                <button onclick="updateStage()" class="btn btn-primary w-100 mb-2">Actualizar Etapa</button>
+                <button onclick="openDeleteModalLeadDetail({{ lead.id }})" class="btn btn-outline-danger w-100">
+                    <i class="bi bi-trash"></i> Eliminar lead
+                </button>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="cardx">
+                <div class="eyebrow mb-3">Agregar Nota</div>
+
+                <!-- Notas recientes (widgets) -->
+                {% if notes %}
+                <div class="mb-3" style="max-height: 170px; overflow-y: auto; scrollbar-width: thin;">
+                    {% for note in notes %}
+                    <div class="d-flex align-items-start gap-2 mb-2 p-2" style="background: var(--color-surface-hover); border-radius: 8px; border-left: 2px solid var(--color-accent);">
+                        <div class="small" style="line-height: 1.3; width: 100%;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="badge" style="background: var(--color-accent-soft); color: var(--color-accent-light); font-size: .62rem; text-transform: uppercase; letter-spacing: .04em;">nota</span>
+                                <span style="color: var(--color-text-muted); font-size: .62rem;">{{ note.time_since }}</span>
+                            </div>
+                            <div style="color: var(--color-text-primary); font-size: .76rem; margin-top: 3px; line-height: 1.4;">{{ note.description|truncatechars:90 }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p style="color: var(--color-text-muted); font-size: .8rem; margin-bottom: .75rem;">No hay notas recientes.</p>
+                {% endif %}
+
+                <textarea id="note-text" class="form-control mb-3" rows="3" placeholder="Escribe una nota..."></textarea>
+                <button onclick="addNote()" class="btn btn-outline-primary w-100">Guardar Nota</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Resumen IA y Actividades -->
+    <section class="row g-4">
+        <div class="col-lg-7">
+            <div class="cardx mb-4">
+                <div class="eyebrow mb-3">Resumen IA</div>
+                {% if summary %}
+                    <p class="mb-2"><strong>{{ summary.summary_date }}</strong></p>
+                    <p class="mb-0">{{ summary.text|default:"Sin texto disponible." }}</p>
+                {% else %}
+                    <p class="muted mb-0">No hay resumen IA disponible para este contacto.</p>
+                {% endif %}
+            </div>
+
+            <!-- Trazabilidad visual -->
+            <div class="cardx">
+                <div class="eyebrow mb-3">Trazabilidad de Etapas</div>
+                <div class="trace-bar">
+                    {% for stage in trace_data %}
+                    <div class="trace-step" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span class="stage-node {% if stage.is_current %}trace-active{% endif %}"></span>
+                            <span style="color: var(--color-text-primary); font-size: .82rem;">{{ stage.name }}</span>
+                        </div>
+                        {% if stage.duration %}
+                        <span style="color: var(--color-text-muted); font-size: .65rem; margin-left: 17px; white-space: nowrap;">{{ stage.duration }}{% if stage.is_current %} · en curso{% endif %}</span>
+                        {% endif %}
+                    </div>
+                    {% if not forloop.last %}<div class="trace-line"></div>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
         </div>
 
-        <!-- Encabezado del Lead -->
-        <section class="cardx mb-4">
-            <div class="eyebrow mb-2">Detalle de lead</div>
-            <h1 class="h3 mb-2">{{ lead.contact.full_name }}</h1>
-            <div class="d-flex flex-wrap gap-2 mb-3">
-                <span class="pill">{{ lead.current_stage }}</span>
-                {% if lead.is_closed %}<span class="pill">{{ lead.closed_result|default:"closed" }}</span>{% endif %}
-            </div>
-            <p class="mb-1"><strong>Teléfono:</strong> {{ lead.contact.phone_number }}</p>
-            <p class="mb-1"><strong>Email:</strong> {{ lead.contact.email|default:"Sin email" }}</p>
-            <p class="mb-1"><strong>Producto:</strong> {{ lead.product_of_interest|default:"Sin producto" }}</p>
-            <p class="mb-0"><strong>Categoría:</strong> {{ lead.product_category|default:"Sin categoría" }}</p>
-        </section>
-
-        <!-- Panel de Cambio de Etapa y Notas -->
-        <section class="row g-4 mb-4">
-            <div class="col-md-6">
-                <div class="cardx">
-                    <div class="eyebrow mb-3">Cambiar Etapa</div>
-                    <select id="stage-select" class="form-select mb-3">
-                        {% for stage in pipeline.stages %}
-                            <option value="{{ stage.name }}" {% if stage.name == lead.current_stage %}selected{% endif %}>{{ stage.name }}</option>
-                        {% endfor %}
-                    </select>
-                    <button onclick="updateStage()" class="btn btn-primary w-100">Actualizar Etapa</button>
+        <div class="col-lg-5">
+            <div class="cardx">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="eyebrow mb-0">Actividad</div>
+                    <button onclick="addActivity()" class="btn btn-sm btn-outline-light">+ Agregar</button>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="cardx">
-                    <div class="eyebrow mb-3">Agregar Nota</div>
-                    <textarea id="note-text" class="form-control mb-3" rows="3" placeholder="Escribe una nota..."></textarea>
-                    <button onclick="addNote()" class="btn btn-outline-primary w-100">Guardar Nota</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Resumen IA y Actividades -->
-        <section class="row g-4">
-            <div class="col-lg-7">
-                <div class="cardx mb-4">
-                    <div class="eyebrow mb-3">Resumen IA</div>
-                    {% if summary %}
-                        <p class="mb-2"><strong>{{ summary.summary_date }}</strong></p>
-                        <p class="mb-0">{{ summary.text|default:"Sin texto disponible." }}</p>
-                    {% else %}
-                        <p class="muted mb-0">No hay resumen IA disponible para este contacto.</p>
-                    {% endif %}
-                </div>
-                
-                <!-- Trazabilidad visual -->
-                <div class="cardx">
-                    <div class="eyebrow mb-3">Trazabilidad de Etapas</div>
-                    <div id="trace-bar" class="trace-bar"></div>
-                </div>
-            </div>
-            
-            <div class="col-lg-5">
-                <div class="cardx">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="eyebrow mb-0">Actividad</div>
-                        <button onclick="addActivity()" class="btn btn-sm btn-outline-light">+ Agregar</button>
-                    </div>
-                    <div id="activity-list">
-                        {% for activity in lead.activities.all %}
-                            <div class="timeline-item">
-                                <div><strong>{{ activity.activity_type }}</strong></div>
-                                <div class="muted small">{{ activity.created_at }}</div>
-                                <div>{{ activity.description }}</div>
+                <div id="activity-list">
+                    {% for activity in lead.activities.all %}
+                        <div class="timeline-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong>{{ activity.activity_type }}</strong>
+                                {% if activity.performed_by %}<span style="color: var(--color-text-muted); font-size: .65rem;">por {{ activity.performed_by }}</span>{% endif %}
                             </div>
-                        {% empty %}
-                            <p class="muted mb-0">Todavía no hay actividades registradas.</p>
-                        {% endfor %}
-                    </div>
+                            <div class="muted small">{{ activity.created_at }}</div>
+                            <div>{{ activity.description }}</div>
+                        </div>
+                    {% empty %}
+                        <p class="muted mb-0">Todavía no hay actividades registradas.</p>
+                    {% endfor %}
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </section>
+</div>
+{% endblock %}
 
-    <script>
-        const leadId = {{ lead.id }};
-        const tenantSlug = "{{ tenant.slug }}";
-        const apiUrl = `/api/crm/leads/${leadId}/?tenant_slug=${tenantSlug}`;
+{% block extra_js %}
+<script src="{% static 'crm/js/dashboard.js' %}"></script>
+<script>
+    const leadId = {{ lead.id }};
+    const tenantSlug = "{{ tenant.slug }}";
+    const apiBase = `/api/crm/leads/${leadId}`;
+    const apiQuery = `?tenant_slug=${encodeURIComponent(tenantSlug)}`;
 
-        async function apiCall(url, method = 'GET', body = null) {
-            const options = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                },
-            };
-            if (body) options.body = JSON.stringify(body);
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                alert('Error en la solicitud: ' + response.statusText);
-                return null;
-            }
-            return response.json();
+    async function apiCall(url, method = 'GET', body = null) {
+        const options = {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+        };
+        if (body) options.body = JSON.stringify(body);
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            alert('Error en la solicitud: ' + response.statusText);
+            return null;
         }
+        return response.json();
+    }
 
-        async function updateStage() {
-            const newStage = document.getElementById('stage-select').value;
-            await apiCall(apiUrl, 'PATCH', { current_stage: newStage });
-            location.reload();
-        }
+    async function updateStage() {
+        const newStage = document.getElementById('stage-select').value;
+        await apiCall(apiBase + '/' + apiQuery, 'PATCH', { current_stage: newStage });
+        location.reload();
+    }
 
-        async function addNote() {
-            const note = document.getElementById('note-text').value.trim();
-            if (!note) return alert('Escribe una nota.');
-            await apiCall(apiUrl + 'add_note/', 'POST', { note });
-            location.reload();
-        }
+    async function addNote() {
+        const note = document.getElementById('note-text').value.trim();
+        if (!note) return alert('Escribe una nota.');
+        await apiCall(apiBase + '/add_note/' + apiQuery, 'POST', { note });
+        location.reload();
+    }
 
-        async function addActivity() {
-            const desc = prompt('Describe la actividad:');
+    // Modal handlers for addActivity
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('activityModal');
+        if (!modal) return;
+        const saveBtn = modal.querySelector('#save-activity-btn');
+        const textarea = modal.querySelector('#activity-description');
+        saveBtn.addEventListener('click', async function() {
+            const desc = textarea.value.trim();
             if (!desc) return;
-            await apiCall(apiUrl + 'add_activity/', 'POST', { description: desc });
+            await apiCall(apiBase + '/add_activity/' + apiQuery, 'POST', { description: desc });
+            const modalObj = bootstrap.Modal.getInstance(modal);
+            if (modalObj) modalObj.hide();
             location.reload();
-        }
+        });
+    });
 
-        // Build trace bar
-        async function buildTraceBar() {
-            const traceBar = document.getElementById('trace-bar');
-            try {
-                const data = await apiCall(apiUrl + 'activity/');
-                if (!data || !data.activities) return;
-                const activities = data.activities;
-                const stages = activities
-                    .filter(a => a.activity_type === 'stage_change')
-                    .map(a => a.description.replace('Etapa cambiada a ', ''));
-                stages.push("{{ lead.current_stage }}"); // current stage
-                const uniqueStages = [...new Set(stages)];
-                traceBar.innerHTML = uniqueStages.map((stage, i) => {
-                    const activeClass = stage === "{{ lead.current_stage }}" ? 'trace-active' : '';
-                    return `<div class="trace-step"><span class="stage-node ${activeClass}"></span>${stage}</div>${i < uniqueStages.length-1 ? '<div class="trace-line"></div>' : ''}`;
-                }).join('');
-            } catch(e) {}
+    function addActivity() {
+        const modal = document.getElementById('activityModal');
+        if (!modal) return;
+        const textarea = modal.querySelector('#activity-description');
+        textarea.value = '';
+        const modalObj = new bootstrap.Modal(modal);
+        modalObj.show();
+    }
+
+    // Delete lead from detail page
+    window.openDeleteModalLeadDetail = function(leadId) {
+        var modalEl = document.getElementById('deleteLeadModal');
+        if (modalEl) {
+            var modal = new bootstrap.Modal(modalEl);
+            modal.show();
         }
-        buildTraceBar();
-    </script>
-</body>
-</html>
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var confirmBtn = document.getElementById('confirm-delete-btn-detail');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function() {
+                var tenantSlug = window.tenantSlug || "{{ tenant.slug }}";
+                var url = '/api/crm/leads/' + leadId + '/?tenant_slug=' + encodeURIComponent(tenantSlug);
+
+                fetch(url, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                })
+                .then(function(response) {
+                    if (response.ok || response.status === 204) {
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('deleteLeadModal'));
+                        if (modal) modal.hide();
+                        window.location.href = '/crm/' + tenantSlug + '/dashboard/';
+                    } else {
+                        alert('Error al eliminar lead');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    alert('Error al eliminar lead');
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal para agregar actividad -->
+<div class="modal fade" id="activityModal" tabindex="-1" aria-labelledby="activityModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="activityModalLabel">Nueva Actividad</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <textarea id="activity-description" class="form-control" rows="4" placeholder="Describe la actividad..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="save-activity-btn" class="btn btn-primary">Guardar Actividad</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal eliminar lead -->
+<div class="modal fade" id="deleteLeadModal" tabindex="-1" aria-labelledby="deleteLeadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteLeadModalLabel">Eliminar lead</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">¿Estás seguro? El lead se moverá a la papelera durante 30 días.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirm-delete-btn-detail" class="btn btn-danger">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -8,6 +8,7 @@ contiene reglas de negocio duras.
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
@@ -31,6 +32,7 @@ class TenantViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = Tenant.objects.filter(is_active=True)
     lookup_field = "slug"
+    permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):
         """Selecciona el serializador en funcion de la accion actual.

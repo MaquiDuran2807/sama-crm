@@ -8,6 +8,13 @@
 <link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
 {% endblock %}
 
+{% block header_actions %}
+{{ block.super }}
+<a href="/crm/{{ tenant.slug }}/trash/" class="btn-refresh" aria-label="Papelera">
+    <i class="bi bi-trash"></i> Papelera
+</a>
+{% endblock %}
+
 {% block content %}
 <section class="stats-row" aria-label="Metricas del pipeline">
     <article class="stat-card total" aria-labelledby="stat-total">
@@ -57,10 +64,15 @@
 
 <section class="kanban-container" id="kanban-board" aria-label="Tablero Kanban del pipeline">
     {% for stage in pipeline %}
-    <div class="kanban-column" data-stage="{{ stage.name }}" data-stage-color="{{ stage.color|default:'#64748b' }}" role="region" aria-label="Etapa {{ stage.name }}">
+    <div class="kanban-column"
+         data-stage="{{ stage.name }}"
+         data-stage-color="{{ stage.color|default:'var(--color-text-muted)' }}"
+         data-is-closed="{% if stage.is_closed %}true{% endif %}"
+         data-order="{{ stage.order }}"
+         role="region" aria-label="Etapa {{ stage.name }}">
         <header class="kanban-column-header">
             <span class="kanban-stage-name">
-                <span class="kanban-stage-dot" style="background-color: {{ stage.color|default:'#64748b' }};" aria-hidden="true"></span>
+                <span class="kanban-stage-dot" style="--stage-color: {{ stage.color|default:'var(--color-text-muted)' }};" aria-hidden="true"></span>
                 {{ stage.name }}
             </span>
             <span class="kanban-stage-count" aria-label="{{ stage.lead_count }} leads">{{ stage.lead_count|default:"0" }}</span>
@@ -72,10 +84,12 @@
                draggable="true"
                data-lead-id="{{ lead.id }}"
                data-stage-color="{{ stage.color|default:'#64748b' }}"
+               data-is-closed="{% if lead.is_closed %}true{% endif %}"
+               data-product="{{ lead.product_of_interest|default:'' }}"
                data-name="{{ lead.contact.full_name|lower }}"
                data-phone="{{ lead.contact.phone_number }}"
                data-product="{{ lead.product_of_interest|lower }}"
-               style="--stage-color: {{ stage.color|default:'#64748b' }};"
+               style="--stage-color: {{ stage.color|default:'var(--color-text-muted)' }};"
                aria-label="Lead {{ lead.contact.full_name }}, {{ lead.product_of_interest }}">
                 <div class="lead-card-header">
                     <span class="lead-card-name">{{ lead.contact.full_name }}</span>
@@ -109,6 +123,98 @@
     </div>
     {% endfor %}
 </section>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal 1: Nota obligatoria en todo drag & drop -->
+<div class="modal fade" id="noteModal" tabindex="-1" aria-labelledby="noteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="noteModalLabel">Añadir nota</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <textarea id="drag-note-text" class="form-control" rows="3"
+                          placeholder="Añadir nota (opcional)..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="note-modal-save-btn" class="btn btn-primary">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Lead cerrado → etapa activa (error vs recompra) -->
+<div class="modal fade" id="reopenModal" tabindex="-1" aria-labelledby="reopenModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reopenModalLabel">Lead Cerrado</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Este lead está en una etapa cerrada. ¿Qué deseas hacer?</p>
+            </div>
+            <div class="modal-footer" style="gap: .5rem;">
+                <button type="button" id="reopen-error-btn" class="btn btn-outline-light" data-bs-dismiss="modal">Fue un error</button>
+                <button type="button" id="reopen-new-btn" class="btn btn-primary">Nueva oportunidad (recompra)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 3: Sub-paso de error (elegir etapa destino) -->
+<div class="modal fade" id="errorRestoreModal" tabindex="-1" aria-labelledby="errorRestoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="errorRestoreModalLabel">Mover lead a etapa activa</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 small">Selecciona la etapa destino para este lead:</p>
+                <select id="error-stage-select" class="form-select mb-3"></select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="error-confirm-btn" class="btn btn-primary">Mover lead</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 4: Sub-paso de recompra (producto + notas) -->
+<div class="modal fade" id="recompraModal" tabindex="-1" aria-labelledby="recompraModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="recompraModalLabel">Nueva oportunidad (recompra)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 small">
+                    El lead original permanecerá en su etapa cerrada. Se creará un nuevo lead en la primera etapa.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label small">Producto de interés</label>
+                    <input type="text" id="recompra-product" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Notas (opcional)</label>
+                    <textarea id="recompra-notes" class="form-control" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="recompra-confirm-btn" class="btn btn-primary">Crear nuevo lead</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
 {% endblock %}
 
 {% block extra_js %}

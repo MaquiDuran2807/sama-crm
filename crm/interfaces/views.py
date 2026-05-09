@@ -10,8 +10,10 @@ obtener resenas IA y calcular metricas del pipeline.
 from collections import defaultdict
 
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from django.views import View
@@ -33,6 +35,7 @@ from crm.interfaces.serializers import (
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def webhook_sync_contact(request):
     """Webhook para sincronizar un contacto desde WhatsApp/ingesta al CRM.
 
@@ -71,6 +74,7 @@ class ContactViewSet(viewsets.ModelViewSet):
     la capa de dominio.
     """
     serializer_class = ContactSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         """Construye el queryset restringido al tenant indicado por query param."""
@@ -90,6 +94,8 @@ class ContactViewSet(viewsets.ModelViewSet):
 
 class LeadViewSet(viewsets.ModelViewSet):
     """ViewSet CRUD para leads del tenant activo en la peticion."""
+    permission_classes = [IsAuthenticated]
+
     def get_serializer_class(self):
         """Selecciona el serializador apropiado segun la accion de DRF."""
 
@@ -100,7 +106,7 @@ class LeadViewSet(viewsets.ModelViewSet):
         return LeadSerializer
 
     def get_queryset(self):
-        """Devuelve los leads del tenant filtrando por etapa o contacto."""
+        """Devuelve los leads activos del tenant filtrando por etapa o contacto."""
 
         tenant_slug = self.request.query_params.get("tenant_slug")
         if not tenant_slug:
@@ -118,14 +124,16 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         return qs.select_related("contact", "tenant")
 
+    def _username(self):
+        """Retorna el nombre de usuario actual o 'admin' como fallback."""
+        return self.request.user.username or "admin"
+
     def perform_create(self, serializer):
         """Crea un lead y, si corresponde, su fuente de origen asociada."""
-
         tenant_slug = self.request.query_params.get("tenant_slug")
         tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
         lead = serializer.save(tenant=tenant)
 
-        # Si vienen datos de fuente (UTM), crear LeadSource automáticamente
         utm_source = self.request.data.get("utm_source")
         if utm_source:
             LeadSource.objects.create(
@@ -136,26 +144,47 @@ class LeadViewSet(viewsets.ModelViewSet):
                 utm_campaign=self.request.data.get("utm_campaign", ""),
                 landing_page_url=self.request.data.get("landing_page_url", ""),
             )
+        LeadActivity.objects.create(
+            lead=lead,
+            activity_type="created",
+            description="Lead creado",
+            performed_by=self._username(),
+        )
+
+    def perform_destroy(self, instance):
+        """Soft delete del lead: marca como eliminado y registra actividad."""
+        instance.is_deleted = True
+        instance.deleted_at = timezone.now()
+        instance.deleted_by = self._username()
+        instance.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        LeadActivity.objects.create(
+            lead=instance,
+            activity_type="deleted",
+            description="Lead enviado a papelera",
+            performed_by=self._username(),
+        )
 
     def perform_update(self, serializer):
         """Actualiza un lead y registra el cambio de etapa cuando aplique."""
-
         old_stage = self.get_object().current_stage
         new_stage = serializer.validated_data.get("current_stage", old_stage)
         lead = serializer.save()
 
-        # Si cambió la etapa, usar el servicio de dominio para registrar la actividad
         if old_stage != new_stage:
-            change_lead_stage(lead, new_stage, performed_by="user")
+            change_lead_stage(lead, new_stage, performed_by=self._username())
+
+            new_stage_lower = new_stage.lower()
+            if "cerrado" in new_stage_lower or "closed" in new_stage_lower:
+                lead.is_closed = True
+                if "ganado" in new_stage_lower or "won" in new_stage_lower:
+                    lead.closed_result = "won"
+                elif "perdido" in new_stage_lower or "lost" in new_stage_lower:
+                    lead.closed_result = "lost"
+                lead.save(update_fields=["is_closed", "closed_result", "updated_at"])
 
     @action(detail=True, methods=["get"], url_path="summary")
     def summary(self, request, pk=None):
-        """Entrega el ultimo resumen IA disponible para el lead solicitado.
-
-        Args:
-            request: Peticion HTTP de lectura.
-            pk: Identificador primario del lead extraido de la URL.
-        """
+        """Entrega el ultimo resumen IA disponible para el lead solicitado."""
         lead = self.get_object()
         daily_summary = get_lead_summary(lead)
         if not daily_summary:
@@ -165,11 +194,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="stats")
     def stats(self, request):
-        """Devuelve metricas agregadas del pipeline para el tenant indicado.
-
-        Args:
-            request: Peticion HTTP que aporta el query param `tenant_slug`.
-        """
+        """Devuelve metricas agregadas del pipeline para el tenant indicado."""
         tenant_slug = request.query_params.get("tenant_slug")
         if not tenant_slug:
             return Response({"detail": "tenant_slug es obligatorio."}, status=400)
@@ -177,6 +202,132 @@ class LeadViewSet(viewsets.ModelViewSet):
         stats = get_leads_stats(tenant)
         serializer = LeadsStatsSerializer(stats)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="add_note")
+    def add_note(self, request, pk=None):
+        """Registra una nota como actividad en el lead.
+
+        POST /api/crm/leads/{id}/add_note/
+        Body: {"note": "texto de la nota"}
+        A diferencia de add_activity, permite nota vacía (para registro de movimiento).
+        """
+        lead = self.get_object()
+        note = request.data.get("note", "").strip()
+        performed_by = self._username()
+        if note:
+            LeadActivity.objects.create(
+                lead=lead,
+                activity_type="note_added",
+                description=note,
+                performed_by=performed_by,
+            )
+        return Response(
+            {"detail": "Nota guardada."},
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="add_activity")
+    def add_activity(self, request, pk=None):
+        """Registra una actividad manual en el lead.
+
+        POST /api/crm/leads/{id}/add_activity/
+        Body: {"description": "descripción de la actividad"}
+        """
+        lead = self.get_object()
+        description = request.data.get("description", "").strip()
+        if not description:
+            return Response(
+                {"detail": "El campo 'description' es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        LeadActivity.objects.create(
+            lead=lead,
+            activity_type="manual",
+            description=description,
+            performed_by=self._username(),
+        )
+        return Response(
+            {"detail": "Actividad registrada correctamente."},
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=True, methods=["post"], url_path="restore")
+    def restore(self, request, pk=None):
+        """Restaura un lead previamente eliminado (soft delete).
+
+        POST /api/crm/leads/{id}/restore/?tenant_slug=...
+        """
+        tenant_slug = request.query_params.get("tenant_slug")
+        if not tenant_slug:
+            return Response({"detail": "tenant_slug es obligatorio."}, status=400)
+        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        lead = get_object_or_404(
+            Lead.all_objects.filter(tenant=tenant),
+            pk=pk,
+        )
+        if not lead.is_deleted:
+            return Response(
+                {"detail": "El lead no está eliminado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        lead.is_deleted = False
+        lead.deleted_at = None
+        lead.deleted_by = ""
+        lead.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "updated_at"])
+        LeadActivity.objects.create(
+            lead=lead,
+            activity_type="restored",
+            description="Lead restaurado de la papelera",
+            performed_by=self._username(),
+        )
+        return Response({"detail": "Lead restaurado correctamente."})
+
+    @action(detail=False, methods=["get"], url_path="trash")
+    def trash(self, request):
+        """Lista los leads eliminados de un tenant.
+
+        GET /api/crm/leads/trash/?tenant_slug=...
+        """
+        tenant_slug = request.query_params.get("tenant_slug")
+        if not tenant_slug:
+            return Response({"detail": "tenant_slug es obligatorio."}, status=400)
+        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        deleted_leads = (
+            Lead.all_objects.filter(tenant=tenant, is_deleted=True)
+            .select_related("contact", "tenant")
+        )
+        serializer = LeadSerializer(deleted_leads, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="reopen")
+    def reopen(self, request, pk=None):
+        """Crea un nuevo lead a partir de uno cerrado (recompra).
+
+        POST /api/crm/leads/{id}/reopen/?tenant_slug=...
+        El lead original permanece cerrado. Se crea un nuevo lead en la
+        primera etapa del pipeline para el mismo contacto.
+        """
+        lead = self.get_object()
+        if not lead.is_closed:
+            return Response(
+                {"detail": "El lead no está cerrado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from tenants.domain.services import get_pipeline_stages
+        stages = get_pipeline_stages(lead.tenant)
+        if not stages:
+            return Response(
+                {"detail": "No hay etapas configuradas en el pipeline."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        sorted_stages = sorted(stages, key=lambda s: s.get("order", 0))
+        first_stage = sorted_stages[0].get("name", "")
+
+        from crm.domain.services import create_reopen_lead
+        new_lead = create_reopen_lead(lead, first_stage, performed_by=self._username())
+        serializer = LeadDetailSerializer(new_lead)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 def _format_time_since(updated_at):
@@ -191,15 +342,35 @@ def _format_time_since(updated_at):
 
     delta = timezone.now() - updated_at
     if delta.days > 0:
-        return f"hace {delta.days} días"
+        return f"hace {delta.days} d"
     hours = delta.seconds // 3600
     if hours > 0:
         return f"hace {hours}h"
     minutes = max(delta.seconds // 60, 1)
-    return f"hace {minutes} min"
+    return f"hace {minutes}m"
 
 
-class CrmDashboardTemplateView(View):
+def _humanize_duration(seconds: float) -> str:
+    """Convierte segundos a un formato legible (2h 15m, 3d, etc.)."""
+    if seconds < 60:
+        return "< 1 min"
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    minutes = minutes % 60
+    if hours < 24:
+        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+    days = hours // 24
+    hours = hours % 24
+    if days < 30:
+        return f"{days}d {hours}h" if hours else f"{days}d"
+    months = days // 30
+    days = days % 30
+    return f"{months}m {days}d" if days else f"{months}m"
+
+
+class CrmDashboardTemplateView(LoginRequiredMixin, View):
     """Vista HTML del dashboard Kanban del CRM.
 
     Args de la ruta:
@@ -208,6 +379,7 @@ class CrmDashboardTemplateView(View):
     """
 
     template_name = "crm/dashboard.html"
+    login_url = "/admin/login/"
 
     def get(self, request, tenant_slug: str, *args, **kwargs):
         """Construye el contexto del tablero Kanban para un tenant concreto."""
@@ -220,7 +392,7 @@ class CrmDashboardTemplateView(View):
         stats = get_leads_stats(tenant)
         stages = get_pipeline_stages(tenant)
         leads = (
-            Lead.objects.filter(tenant=tenant)
+            Lead.objects.filter(tenant=tenant, is_deleted=False)
             .select_related("contact")
             .order_by("current_stage", "-updated_at")
         )
@@ -235,6 +407,8 @@ class CrmDashboardTemplateView(View):
         for stage in stages:
             stage_name = stage.get("name", "")
             stage_leads = leads_by_stage.get(stage_name, [])
+            stage_lower = stage_name.lower()
+            is_closed = "cerrado" in stage_lower or "closed" in stage_lower
             pipeline.append(
                 {
                     "name": stage_name,
@@ -242,6 +416,7 @@ class CrmDashboardTemplateView(View):
                     "order": stage.get("order", 0),
                     "lead_count": len(stage_leads),
                     "leads": stage_leads,
+                    "is_closed": is_closed,
                 }
             )
 
@@ -253,7 +428,7 @@ class CrmDashboardTemplateView(View):
         return render(request, self.template_name, context)
 
 
-class CrmLeadDetailTemplateView(View):
+class CrmLeadDetailTemplateView(LoginRequiredMixin, View):
     """Vista HTML de detalle para un lead concreto del CRM.
 
     Args de la ruta:
@@ -262,22 +437,166 @@ class CrmLeadDetailTemplateView(View):
     """
 
     template_name = "crm/lead_detail.html"
+    login_url = "/admin/login/"
 
     def get(self, request, tenant_slug: str, lead_id: int, *args, **kwargs):
         """Construye el contexto del detalle del lead y su actividad asociada."""
 
         tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
         lead = get_object_or_404(
-            Lead.objects.select_related("contact", "tenant").prefetch_related("activities"),
+            Lead.objects.select_related("contact", "tenant", "source").prefetch_related("activities"),
             pk=lead_id,
             tenant=tenant,
         )
         summary = get_lead_summary(lead)
+        pipeline_stages = get_pipeline_stages(tenant)
+        activities = lead.activities.all()
+        now = timezone.now()
+
+        # Añadir time_since a cada actividad para mostrar tiempo relativo
+        for activity in activities:
+            activity.time_since = _format_time_since(activity.created_at)
+
+        # ── Calcular trace_data con duraciones de etapa ──
+        stage_changes = [
+            a for a in activities if a.activity_type == "stage_change"
+        ]
+        stage_changes.sort(key=lambda a: a.created_at)
+
+        # entries: lista de (stage_name, entry_datetime, exit_datetime)
+        entries: list[tuple[str, Any, Any]] = []
+
+        if stage_changes:
+            # Etapa inicial (antes del primer cambio)
+            first_target = stage_changes[0].description.replace(
+                "Etapa cambiada a ", ""
+            ).strip()
+            prev_stage = None
+            for i, s in enumerate(pipeline_stages):
+                if s.get("name") == first_target and i > 0:
+                    prev_stage = pipeline_stages[i - 1].get("name")
+                    break
+            if prev_stage:
+                entries.append((prev_stage, lead.created_at, stage_changes[0].created_at))
+
+            # Etapas registradas por cada stage_change
+            for i, act in enumerate(stage_changes):
+                stage_name = act.description.replace("Etapa cambiada a ", "").strip()
+                entry_time = act.created_at
+                exit_time = (
+                    stage_changes[i + 1].created_at
+                    if i + 1 < len(stage_changes)
+                    else now
+                )
+                entries.append((stage_name, entry_time, exit_time))
+        else:
+            # Nunca cambió de etapa; única etapa desde creación
+            entries.append((lead.current_stage, lead.created_at, now))
+
+        trace_data = []
+        for stage in pipeline_stages:
+            name = stage.get("name", "")
+            is_current = name == lead.current_stage
+            duration_str = ""
+            for sname, entry, exit_ in entries:
+                if sname == name:
+                    duration_seconds = (exit_ - entry).total_seconds()
+                    duration_str = _humanize_duration(duration_seconds)
+                    break
+            trace_data.append({
+                "name": name,
+                "color": stage.get("color", "#64748b"),
+                "duration": duration_str,
+                "is_current": is_current,
+                "order": stage.get("order", 0),
+            })
+
+        # Notas: actividades de tipo note_added (más recientes primero)
+        notes = [a for a in activities if a.activity_type == "note_added"]
 
         context = {
             "tenant": tenant,
             "lead": lead,
             "summary": summary,
-            "activities": lead.activities.all(),
+            "pipeline_stages": pipeline_stages,
+            "trace_data": trace_data,
+            "activities": activities,
+            "notes": notes[:5],
+        }
+        return render(request, self.template_name, context)
+
+
+class CrmTrashTemplateView(LoginRequiredMixin, View):
+    """Vista HTML de la papelera de leads eliminados.
+
+    Args de la ruta:
+        tenant_slug: Slug del tenant.
+    """
+
+    template_name = "crm/trash.html"
+    login_url = "/admin/login/"
+
+    def get(self, request, tenant_slug: str, *args, **kwargs):
+        """Lista los leads eliminados del tenant."""
+
+        tenant = get_object_or_404(
+            Tenant.objects.select_related("pipeline_config"),
+            slug=tenant_slug,
+            is_active=True,
+        )
+        deleted_leads = (
+            Lead.all_objects.filter(tenant=tenant, is_deleted=True)
+            .select_related("contact")
+            .order_by("-deleted_at")
+        )
+        for lead in deleted_leads:
+            lead.time_since_update = _format_time_since(lead.updated_at)
+
+        context = {
+            "tenant": tenant,
+            "deleted_leads": deleted_leads,
+        }
+        return render(request, self.template_name, context)
+
+
+def _get_csrf_token(request) -> str:
+    """Obtiene el CSRF token del request."""
+    try:
+        from django.middleware.csrf import get_token
+        return get_token(request)
+    except Exception:
+        return ""
+
+
+class CrmTrashTemplateView(LoginRequiredMixin, View):
+    """Vista HTML de la papelera de leads eliminados.
+
+    Args de la ruta:
+        tenant_slug: Slug del tenant.
+    """
+
+    template_name = "crm/trash.html"
+    login_url = "/admin/login/"
+
+    def get(self, request, tenant_slug: str, *args, **kwargs):
+        """Lista los leads eliminados del tenant."""
+        csrf_token = _get_csrf_token(request)
+        tenant = get_object_or_404(
+            Tenant.objects.select_related("pipeline_config"),
+            slug=tenant_slug,
+            is_active=True,
+        )
+        deleted_leads = (
+            Lead.all_objects.filter(tenant=tenant, is_deleted=True)
+            .select_related("contact")
+            .order_by("-deleted_at")
+        )
+        for lead in deleted_leads:
+            lead.time_since_update = _format_time_since(lead.updated_at)
+
+        context = {
+            "tenant": tenant,
+            "deleted_leads": deleted_leads,
+            "csrf_token": csrf_token,
         }
         return render(request, self.template_name, context)
