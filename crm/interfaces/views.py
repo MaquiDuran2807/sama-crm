@@ -8,7 +8,10 @@ obtener resenas IA y calcular metricas del pipeline.
 """
 
 from collections import defaultdict
+from datetime import timedelta
+from typing import Any
 
+from django.db.models import Avg, Count, Q
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -600,3 +603,211 @@ class CrmTrashTemplateView(LoginRequiredMixin, View):
             "csrf_token": csrf_token,
         }
         return render(request, self.template_name, context)
+
+
+class CrmAnalyticsTemplateView(LoginRequiredMixin, View):
+    """Vista HTML del dashboard de analíticas del CRM."""
+
+    template_name = "crm/analytics.html"
+    login_url = "/admin/login/"
+
+    def get(self, request, tenant_slug: str, *args, **kwargs):
+        """Renderiza el dashboard de analíticas con datos iniciales."""
+        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        csrf_token = _get_csrf_token(request)
+        context = {
+            "tenant": tenant,
+            "csrf_token": csrf_token,
+        }
+        return render(request, self.template_name, context)
+
+
+class PipelineConfigView(LoginRequiredMixin, View):
+    """Vista HTML para configurar el pipeline de ventas del tenant."""
+
+    template_name = "crm/pipeline_config.html"
+    login_url = "/admin/login/"
+
+    def get(self, request, tenant_slug: str, *args, **kwargs):
+        """Renderiza la página de configuración del pipeline."""
+        from tenants.domain.models import PipelineConfig
+
+        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        pipeline_config = get_object_or_404(PipelineConfig, tenant=tenant)
+        csrf_token = _get_csrf_token(request)
+        context = {
+            "tenant": tenant,
+            "stages": pipeline_config.stages,
+            "csrf_token": csrf_token,
+        }
+        return render(request, self.template_name, context)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def analytics_api(request, tenant_slug: str):
+    """API de analíticas del pipeline.
+
+    Query params:
+        days: int (default 30) — filtra leads creados en los últimos N días.
+        source: str (opcional) — filtra por LeadSource.platform.
+
+    Returns JSON con funnel, leads_by_source, leads_by_day y summary.
+    """
+    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+
+    days = int(request.query_params.get("days", 30))
+    offset = int(request.query_params.get("offset", 0))
+    source_filter = request.query_params.get("source", "").strip()
+
+    since = timezone.now() - timedelta(days=days + (offset * days))
+    until = timezone.now() - timedelta(days=(offset * days)) if offset > 0 else None
+
+    leads_qs = Lead.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        created_at__gte=since,
+    )
+    if until:
+        leads_qs = leads_qs.filter(created_at__lte=until)
+
+    if source_filter:
+        leads_qs = leads_qs.filter(source__platform=source_filter)
+
+    # ── Funnel: leads por etapa, ordenados por pipeline ──
+    try:
+        pipeline_stages = list(tenant.pipeline_config.stages or [])
+    except Exception:
+        pipeline_stages = []
+
+    stage_counts = (
+        leads_qs.values("current_stage")
+        .annotate(count=Count("id"))
+    )
+    stage_map = {row["current_stage"]: row["count"] for row in stage_counts}
+
+    funnel = []
+    for stage in sorted(pipeline_stages, key=lambda s: s.get("order", 0)):
+        funnel.append({
+            "stage": stage.get("name", ""),
+            "count": stage_map.get(stage.get("name", ""), 0),
+        })
+    for stage_name in leads_qs.values_list("current_stage", flat=True).distinct():
+        if not any(s.get("name") == stage_name for s in pipeline_stages):
+            funnel.append({"stage": stage_name, "count": stage_map.get(stage_name, 0)})
+
+    # ── Leads by source ──
+    source_counts = (
+        leads_qs.filter(source__isnull=False)
+        .values("source__platform")
+        .annotate(count=Count("id"))
+    )
+    leads_by_source = [
+        {"source": row["source__platform"] or "unknown", "count": row["count"]}
+        for row in source_counts
+    ]
+
+    # ── Leads by day ──
+    date_counts = (
+        leads_qs.extra(select={"day": "DATE(created_at)"})
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    leads_by_day = [
+        {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
+        for row in date_counts
+    ]
+
+    # ── Summary ──
+    total_leads = leads_qs.count()
+    won_leads = leads_qs.filter(is_closed=True, closed_result="won").count()
+    conversion_rate = (won_leads / total_leads) if total_leads > 0 else 0
+
+    week_start = timezone.now() - timedelta(days=7)
+    leads_this_week = leads_qs.filter(created_at__gte=week_start).count()
+
+    closed_won = leads_qs.filter(is_closed=True, closed_result="won")
+    if closed_won.exists():
+        durations = [
+            (lead.updated_at - lead.created_at).total_seconds() / 86400
+            for lead in closed_won.only("created_at", "updated_at")
+            if lead.created_at and lead.updated_at
+        ]
+        avg_days = sum(durations) / len(durations) if durations else 0
+    else:
+        avg_days = 0
+
+    # ── Leads by day for closed won ──
+    won_qs = Lead.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        is_closed=True,
+        closed_result="won",
+        created_at__gte=since,
+    )
+    won_date_counts = (
+        won_qs.extra(select={"day": "DATE(created_at)"})
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    leads_by_stage_won = [
+        {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
+        for row in won_date_counts
+    ]
+
+    # ── Leads by day for closed lost ──
+    lost_qs = Lead.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        is_closed=True,
+        closed_result="lost",
+        created_at__gte=since,
+    )
+    lost_date_counts = (
+        lost_qs.extra(select={"day": "DATE(created_at)"})
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    leads_by_stage_lost = [
+        {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
+        for row in lost_date_counts
+    ]
+
+    # ── Quotes sent (leads in Cotización Enviada stage) ──
+    quotes_qs = Lead.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        current_stage__icontains="Cotizacion",
+        created_at__gte=since,
+    )
+    quotes_date_counts = (
+        quotes_qs.extra(select={"day": "DATE(created_at)"})
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    quotes_sent = [
+        {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
+        for row in quotes_date_counts
+    ]
+
+    return Response({
+        "funnel": funnel,
+        "leads_by_source": leads_by_source,
+        "leads_by_day": leads_by_day,
+        "leads_by_stage_won": leads_by_stage_won,
+        "leads_by_stage_lost": leads_by_stage_lost,
+        "quotes_sent": quotes_sent,
+        "summary": {
+            "total_leads": total_leads,
+            "won_leads": won_leads,
+            "lost_leads": leads_qs.filter(is_closed=True, closed_result="lost").count(),
+            "quotes_sent_count": quotes_qs.count(),
+            "conversion_rate": round(conversion_rate, 3),
+            "avg_days_to_close": round(avg_days, 1),
+            "leads_this_week": leads_this_week,
+        },
+    })

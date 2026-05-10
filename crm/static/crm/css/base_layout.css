@@ -1,0 +1,335 @@
+/* crm/static/crm/css/base_layout.css
+   Estilos globales que aplican a todas las páginas CRM.
+   Header, footer, botones, modals, skip-link, body base.
+*/
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+        radial-gradient(ellipse at 20% 50%, rgb(var(--color-primary-rgb) / 0.15) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgb(var(--color-accent-rgb) / 0.08) 0%, transparent 60%);
+    background-attachment: fixed;
+    transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+body.theme-light {
+    background-image: none;
+}
+
+.skip-link {
+    position: absolute;
+    top: -100px;
+    left: 1rem;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    padding: 0.5rem 1rem;
+    z-index: 9999;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    text-decoration: none;
+    transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+    top: 1rem;
+}
+
+/* ─── HEADER ─── */
+.dashboard-header {
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+    border-bottom: 1px solid rgb(var(--color-text-on-primary-rgb) / 0.1);
+    padding: 1rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    max-width: 100%;
+}
+
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.header-logo-icon {
+    width: 48px;
+    height: 48px;
+    background: rgb(var(--color-text-on-primary-rgb) / 0.15);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-accent);
+    flex-shrink: 0;
+}
+
+.header-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--color-text-on-primary);
+    letter-spacing: -0.01em;
+}
+
+.header-subtitle {
+    font-size: 0.85rem;
+    margin: 0.25rem 0 0 0;
+    color: rgb(var(--color-text-on-primary-rgb) / 0.7);
+    font-weight: 400;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* ─── FOOTER ─── */
+.dashboard-footer {
+    text-align: center;
+    padding: 1rem;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--color-border);
+    margin-top: 3rem;
+}
+
+.dashboard-footer p {
+    margin: 0;
+}
+
+/* ─── BOTONES GLOBALES ─── */
+.btn-refresh,
+.theme-toggle,
+.user-avatar-toggle {
+    background: rgb(var(--color-border-rgb) / 0.06);
+    border: 1px solid rgb(var(--color-border-rgb) / 0.16);
+    color: var(--color-text-primary);
+    transition: all var(--transition-fast);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+}
+
+.btn-refresh:hover,
+.theme-toggle:hover,
+.user-avatar-toggle:hover,
+.btn-refresh:focus-visible,
+.theme-toggle:focus-visible,
+.user-avatar-toggle:focus-visible {
+    background: rgb(var(--color-border-rgb) / 0.12);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    box-shadow: var(--shadow-glow-orange);
+}
+
+.user-avatar-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-decoration: none;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.user-avatar-toggle::after {
+    display: none;
+}
+
+.user-avatar-toggle-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+}
+
+/* ─── DROPDOWN MENU ─── */
+.crm-user-menu {
+    min-width: 220px;
+    padding: 0.75rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+}
+
+.crm-user-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.25rem 0.75rem 0.75rem;
+    color: var(--color-text-primary);
+}
+
+.crm-user-menu-header i {
+    font-size: 1.6rem;
+    color: var(--color-accent);
+}
+
+.crm-user-menu-header strong {
+    display: block;
+    font-size: 0.95rem;
+}
+
+.crm-user-menu-header span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.crm-user-menu .dropdown-item {
+    color: var(--color-text-primary);
+    border-radius: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.crm-user-menu .dropdown-item:hover,
+.crm-user-menu .dropdown-item:focus {
+    background: var(--color-surface-hover);
+    color: var(--color-accent);
+}
+
+.crm-user-menu .dropdown-item.disabled,
+.crm-user-menu .dropdown-item:disabled {
+    color: var(--color-text-muted);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.crm-user-menu .dropdown-divider {
+    border-top-color: var(--color-border);
+    opacity: 1;
+}
+
+/* ─── MODALS ─── */
+.crm-modal-content {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.crm-modal-content .modal-header,
+.crm-modal-content .modal-footer {
+    border-color: var(--color-border);
+}
+
+.crm-modal-content .modal-title {
+    color: var(--color-accent);
+}
+
+.crm-modal-content .form-control,
+.crm-modal-content .form-select,
+.crm-modal-content textarea,
+.crm-modal-content input {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-border);
+}
+
+.crm-modal-content .form-control::placeholder,
+.crm-modal-content textarea::placeholder,
+.crm-modal-content input::placeholder {
+    color: var(--color-text-muted);
+}
+
+.crm-modal-content .form-control:focus,
+.crm-modal-content .form-select:focus,
+.crm-modal-content textarea:focus,
+.crm-modal-content input:focus {
+    background: var(--color-surface-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 0.2rem rgb(var(--color-accent-rgb) / 0.15);
+}
+
+/* ─── MAIN CONTAINER (global) ─── */
+.main-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0.75rem;
+}
+
+/* ─── RESPONSIVE GLOBAL ─── */
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .header-title {
+        font-size: 1.2rem;
+    }
+
+    .main-container {
+        padding: 1rem;
+    }
+
+    .header-logo-icon {
+        width: 34px;
+        height: 34px;
+        font-size: 1.1rem;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-title {
+        font-size: 1rem;
+    }
+}
+
+/* ─── PRINT ─── */
+@media print {
+    body {
+        background: var(--color-surface);
+        color: var(--color-text-primary);
+    }
+
+    .dashboard-header {
+        position: static;
+        background: var(--color-primary);
+    }
+}

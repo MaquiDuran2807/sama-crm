@@ -6,6 +6,7 @@ lead del CRM, validando el comportamiento observable de la capa de interfaces.
 """
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import TestCase, Client
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -80,6 +81,20 @@ class CRMAPITestCase(TestCase):
         self.assertEqual(lead.product_of_interest, "Panel Solar 450W")
         self.assertTrue(hasattr(lead, "source"))
         self.assertEqual(lead.source.platform, "meta")
+
+    def test_analytics_api_reflects_seed_sources(self):
+        """Valida que el seed demo deje datos visibles en analytics."""
+
+        call_command("seed_solar_client")
+
+        response = self.client.get("/api/crm/tenants/codensolar/analytics/?days=365")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["summary"]["total_leads"], 80)
+        self.assertGreaterEqual(sum(row["count"] for row in response.data["leads_by_source"]), 80)
+
+        sources = {row["source"] for row in response.data["leads_by_source"]}
+        self.assertTrue({"meta", "google", "tiktok", "web", "referral"}.issubset(sources))
+        self.assertGreaterEqual(len(response.data["leads_by_day"]), 5)
 
     def test_stage_change_creates_activity(self):
         """Valida que un cambio de etapa registre actividad en el historial."""
@@ -233,6 +248,10 @@ class CRMAPITestCase(TestCase):
         self.assertContains(response, "Codensolar SAS")
         self.assertContains(response, "Pipeline de Ventas")
         self.assertContains(response, "crm/css/themes.css")
+        self.assertContains(response, "crm/css/base_layout.css")
+        self.assertContains(response, "crm/css/dashboard.css")
+        self.assertContains(response, "crm/js/theme.js")
+        self.assertContains(response, "crm/js/dashboard.js")
         self.assertContains(response, "bi-person-circle")
         self.assertContains(response, "Configuración")
 
@@ -259,3 +278,76 @@ class CRMAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, "Juan Pérez")
         self.assertContains(response, "Panel Solar 450W")
+
+    def test_analytics_html_renders(self):
+        """Valida que la pagina HTML de analiticas cargue los archivos correctos."""
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/analytics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "crm/css/themes.css")
+        self.assertContains(response, "crm/css/base_layout.css")
+        self.assertContains(response, "crm/css/dashboard.css")
+        self.assertContains(response, "crm/css/analytics.css")
+        self.assertContains(response, "crm/js/theme.js")
+        self.assertContains(response, "crm/js/analytics.js")
+        self.assertContains(response, "chart.js")
+
+    def test_theme_toggle_button_exists(self):
+        """Verifica que el boton de theme toggle esta presente en el HTML."""
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/dashboard/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'id="theme-toggle"')
+        self.assertContains(response, 'class="theme-toggle"')
+
+
+class PipelineConfigViewTestCase(TestCase):
+    """Pruebas para la vista de configuracion del pipeline."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.tenant = Tenant.objects.create(
+            name="Codensolar SAS",
+            slug="codensolar",
+            is_active=True,
+        )
+        self.pipeline = PipelineConfig.objects.create(
+            tenant=self.tenant,
+            stages=[
+                {"name": "Lead", "color": "#003366", "order": 1},
+                {"name": "Cotización Enviada", "color": "#FF9933", "order": 2},
+            ],
+            allow_skip_stages=True,
+        )
+
+    def test_config_page_renders(self):
+        """Comprueba que la pagina de configuracion del pipeline responde 200."""
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/config/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_config_page_contains_stages(self):
+        """Comprueba que el contexto incluya las etapas del pipeline."""
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/config/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("stages", response.context)
+        self.assertEqual(len(response.context["stages"]), 2)
+        self.assertEqual(response.context["stages"][0]["name"], "Lead")
+
+    def test_config_page_requires_login(self):
+        """Comprueba que la pagina redirige si no hay sesion."""
+
+        client = Client()
+        response = client.get("/crm/codensolar/config/")
+        self.assertEqual(response.status_code, 302)

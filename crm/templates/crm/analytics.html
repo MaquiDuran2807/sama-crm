@@ -1,0 +1,98 @@
+{% extends "crm/base.html" %}
+{% load static %}
+
+{% block title %}{{ tenant.name }} | Analíticas | SAMA AdTech{% endblock %}
+
+{% block extra_css %}
+<link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/analytics.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block header_actions %}
+{{ block.super }}
+<a href="/crm/{{ tenant.slug }}/dashboard/" class="btn-refresh" aria-label="Volver al dashboard">
+    <i class="bi bi-arrow-left"></i> Dashboard
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="analytics-page" id="main-content">
+    <div class="filter-bar">
+        <div class="filter-left">
+            <div class="date-navigator">
+                <button class="nav-btn" id="prev-period-btn" title="Mes anterior">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <div class="current-period" id="current-period-label">Mayo 2026</div>
+                <button class="nav-btn" id="next-period-btn" title="Mes siguiente">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+        <div class="filter-right">
+            <div class="view-toggles">
+                <button class="range-btn" data-days="7" id="btn-week">Semana</button>
+                <button class="range-btn active" data-days="30" id="btn-month">Mes</button>
+                <button class="range-btn" data-days="90" id="btn-quarter">Trimestre</button>
+                <button class="range-btn" data-days="365" id="btn-year">Año</button>
+                <button class="range-btn" data-days="0" id="btn-all">Todo</button>
+            </div>
+            <select id="source-filter" class="source-select">
+                <option value="">Todos</option>
+                <option value="meta">Meta</option>
+                <option value="google">Google</option>
+                <option value="tiktok">TikTok</option>
+                <option value="web">Web</option>
+                <option value="referral">Referido</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="summary-cards">
+        <div class="summary-card total">
+            <div class="summary-value" id="stat-total">—</div>
+            <div class="summary-label">Total Leads</div>
+        </div>
+        <div class="summary-card conversion">
+            <div class="summary-value" id="stat-conversion">—%</div>
+            <div class="summary-label">Tasa de conversión</div>
+        </div>
+        <div class="summary-card avg-days">
+            <div class="summary-value" id="stat-avg">—</div>
+            <div class="summary-label">Días promedio cierre</div>
+        </div>
+        <div class="summary-card week">
+            <div class="summary-value" id="stat-week">—</div>
+            <div class="summary-label">Leads esta semana</div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-card">
+            <div class="chart-title">Embudo por etapa</div>
+            <div class="chart-wrapper">
+                <canvas id="funnel-chart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Leads por fuente</div>
+            <div class="chart-wrapper">
+                <canvas id="source-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-full">
+        <div class="chart-title">Leads por día</div>
+        <div class="chart-wrapper">
+            <canvas id="timeline-chart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="{% static 'crm/js/analytics.js' %}"></script>
+{% endblock %}

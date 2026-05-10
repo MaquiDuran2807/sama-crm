@@ -143,3 +143,24 @@ class LeadActivity(models.Model):
 
     def __str__(self):
         return f"{self.activity_type} en {self.lead} ({self.created_at.strftime('%d/%m/%Y %H:%M')})"
+
+
+class DailyFollowupReport(models.Model):
+    """Reporte diario de seguimiento de leads fríos o pendientes."""
+    class ReportType(models.TextChoices):
+        MANANA = "manana", "Mañana"
+        TARDE = "tarde", "Tarde"
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="followup_reports")
+    report_type = models.CharField(max_length=10, choices=ReportType.choices, default=ReportType.MANANA)
+    date = models.DateField()
+    target_leads = models.JSONField(default=list, help_text="Lista de lead_ids a seguir")
+    summary = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-report_type"]
+        unique_together = ["tenant", "date", "report_type"]
+
+    def __str__(self):
+        return f"Reporte {self.report_type} - {self.date}"

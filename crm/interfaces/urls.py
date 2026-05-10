@@ -6,7 +6,7 @@ las acciones de la capa de interfaces queden centralizadas y consistentes.
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from crm.interfaces.views import ContactViewSet, LeadViewSet, webhook_sync_contact
+from crm.interfaces.views import ContactViewSet, LeadViewSet, webhook_sync_contact, analytics_api
 
 router = DefaultRouter()
 router.register(r"contacts", ContactViewSet, basename="contact")
@@ -14,5 +14,6 @@ router.register(r"leads", LeadViewSet, basename="lead")
 
 urlpatterns = [
     path("webhook/chat/", webhook_sync_contact, name="webhook-sync-contact"),
+    path("tenants/<slug:tenant_slug>/analytics/", analytics_api, name="analytics-api"),
     path("", include(router.urls)),
 ]

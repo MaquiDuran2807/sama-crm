@@ -5,23 +5,7 @@
 
 {% block extra_css %}
 <link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
-<style>
-    .shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
-    .cardx { background: var(--color-card-bg); border: 1px solid var(--color-card-border); border-radius: 18px; padding: 1.25rem; box-shadow: var(--shadow-lg); }
-    .eyebrow { color: var(--color-accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
-    .muted { color: var(--color-text-muted); }
-    .pill { display:inline-block; padding:.25rem .7rem; border-radius:999px; background: var(--color-accent-soft); color: var(--color-accent-light); font-size:.8rem; }
-    .timeline-item { border-left: 2px solid var(--color-border); padding-left: 1rem; margin-left: .4rem; margin-bottom: 1rem; }
-    .timeline-item::before { content:''; width:10px; height:10px; border-radius:50%; background: var(--color-accent); display:inline-block; margin-left:-1.45rem; margin-right:.6rem; }
-    .stage-node { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; }
-    .trace-bar { display: flex; align-items: center; margin: 1rem 0; }
-    .trace-step { display: flex; align-items: center; }
-    .trace-line { width: 30px; height: 2px; background: var(--color-border); }
-    .trace-active { background: var(--color-accent) !important; }
-    .source-link { color: var(--color-accent); font-size: .82rem; }
-    .source-link:hover { opacity: 0.8; }
-    #lead-content { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
-</style>
+<link href="{% static 'crm/css/lead_detail.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block header_actions %}
@@ -167,104 +151,10 @@
 
 {% block extra_js %}
 <script src="{% static 'crm/js/dashboard.js' %}"></script>
+<script src="{% static 'crm/js/lead_detail.js' %}"></script>
 <script>
-    const leadId = {{ lead.id }};
-    const tenantSlug = "{{ tenant.slug }}";
-    const apiBase = `/api/crm/leads/${leadId}`;
-    const apiQuery = `?tenant_slug=${encodeURIComponent(tenantSlug)}`;
-
-    async function apiCall(url, method = 'GET', body = null) {
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}',
-            },
-        };
-        if (body) options.body = JSON.stringify(body);
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            alert('Error en la solicitud: ' + response.statusText);
-            return null;
-        }
-        return response.json();
-    }
-
-    async function updateStage() {
-        const newStage = document.getElementById('stage-select').value;
-        await apiCall(apiBase + '/' + apiQuery, 'PATCH', { current_stage: newStage });
-        location.reload();
-    }
-
-    async function addNote() {
-        const note = document.getElementById('note-text').value.trim();
-        if (!note) return alert('Escribe una nota.');
-        await apiCall(apiBase + '/add_note/' + apiQuery, 'POST', { note });
-        location.reload();
-    }
-
-    // Modal handlers for addActivity
     document.addEventListener('DOMContentLoaded', function() {
-        const modal = document.getElementById('activityModal');
-        if (!modal) return;
-        const saveBtn = modal.querySelector('#save-activity-btn');
-        const textarea = modal.querySelector('#activity-description');
-        saveBtn.addEventListener('click', async function() {
-            const desc = textarea.value.trim();
-            if (!desc) return;
-            await apiCall(apiBase + '/add_activity/' + apiQuery, 'POST', { description: desc });
-            const modalObj = bootstrap.Modal.getInstance(modal);
-            if (modalObj) modalObj.hide();
-            location.reload();
-        });
-    });
-
-    function addActivity() {
-        const modal = document.getElementById('activityModal');
-        if (!modal) return;
-        const textarea = modal.querySelector('#activity-description');
-        textarea.value = '';
-        const modalObj = new bootstrap.Modal(modal);
-        modalObj.show();
-    }
-
-    // Delete lead from detail page
-    window.openDeleteModalLeadDetail = function(leadId) {
-        var modalEl = document.getElementById('deleteLeadModal');
-        if (modalEl) {
-            var modal = new bootstrap.Modal(modalEl);
-            modal.show();
-        }
-    };
-
-    document.addEventListener('DOMContentLoaded', function() {
-        var confirmBtn = document.getElementById('confirm-delete-btn-detail');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function() {
-                var tenantSlug = window.tenantSlug || "{{ tenant.slug }}";
-                var url = '/api/crm/leads/' + leadId + '/?tenant_slug=' + encodeURIComponent(tenantSlug);
-
-                fetch(url, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': '{{ csrf_token }}',
-                    },
-                })
-                .then(function(response) {
-                    if (response.ok || response.status === 204) {
-                        var modal = bootstrap.Modal.getInstance(document.getElementById('deleteLeadModal'));
-                        if (modal) modal.hide();
-                        window.location.href = '/crm/' + tenantSlug + '/dashboard/';
-                    } else {
-                        alert('Error al eliminar lead');
-                    }
-                })
-                .catch(function(error) {
-                    console.error('Error:', error);
-                    alert('Error al eliminar lead');
-                });
-            });
-        }
+        initLeadDetail({{ lead.id }}, "{{ tenant.slug }}", "{{ csrf_token }}");
     });
 </script>
 {% endblock %}

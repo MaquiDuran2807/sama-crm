@@ -1,8 +1,10 @@
 /* crm/static/crm/css/themes.css
-   Variables y estilos compartidos del CRM SAMA AdTech.
+   Variables CSS globales para el tema oscuro/claro del CRM.
+   Solo define variables, sin estilos.
 */
 
 :root {
+    /* Colores base */
     --color-bg: #0a0f1e;
     --color-bg-rgb: 10 15 30;
     --color-surface: #111827;
@@ -11,17 +13,24 @@
     --color-surface-hover-rgb: 26 34 53;
     --color-border: #1e293b;
     --color-border-rgb: 30 41 59;
+
+    /* Colores de texto */
     --color-text-primary: #e0e0e0;
     --color-text-secondary: #94a3b8;
     --color-text-muted: #64748b;
     --color-text-tertiary: #64748b;
+
+    /* Colores de marca */
     --color-accent: #FF9933;
     --color-accent-rgb: 255 153 51;
     --color-accent-light: #FFB366;
     --color-product-text: #ffb366;
+
     --color-primary: #003366;
     --color-primary-rgb: 0 51 102;
     --color-primary-light: #004080;
+
+    /* Colores semánticos */
     --color-success: #10b981;
     --color-success-rgb: 16 185 129;
     --color-warning: #f59e0b;
@@ -31,11 +40,15 @@
     --color-danger-light: #f87171;
     --color-info: #3b82f6;
     --color-info-rgb: 59 130 246;
+
+    /* Alias y valores derivados */
     --color-on-accent: #000000;
     --color-text-on-primary: #ffffff;
     --color-text-on-primary-rgb: 255 255 255;
+
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
+
     --color-card-bg: var(--color-surface);
     --color-card-border: var(--color-border);
     --color-dark-bg: var(--color-bg);
@@ -43,6 +56,8 @@
     --color-deep-blue-light: var(--color-primary-light);
     --color-orange: var(--color-accent);
     --color-orange-light: var(--color-accent-light);
+
+    /* Variantes soft (transparentes) */
     --color-surface-soft: rgb(var(--color-surface-rgb) / 0.68);
     --color-surface-strong: rgb(var(--color-surface-rgb) / 0.92);
     --color-primary-soft: rgb(var(--color-primary-rgb) / 0.28);
@@ -52,19 +67,26 @@
     --color-danger-soft: rgb(var(--color-danger-rgb) / 0.2);
     --color-info-soft: rgb(var(--color-info-rgb) / 0.16);
     --color-skeleton-mid: rgb(var(--color-border-rgb) / 0.7);
+
+    /* Sombras */
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow-md: 0 4px 6px rgb(0 0 0 / 0.4);
     --shadow-lg: 0 10px 25px rgb(0 0 0 / 0.5);
     --shadow-glow-orange: 0 0 20px rgb(var(--color-accent-rgb) / 0.2);
     --shadow-glow-blue: 0 0 20px rgb(var(--color-primary-rgb) / 0.2);
+
+    /* Radios */
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
+
+    /* Transiciones */
     --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
     --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Tema claro */
 body.theme-light {
     --color-bg: #f8fafc;
     --color-bg-rgb: 248 250 252;
@@ -94,9 +116,6 @@ body.theme-light {
     --color-danger-light: #ef4444;
     --color-info: #2563eb;
     --color-info-rgb: 37 99 235;
-    --color-on-accent: #000000;
-    --color-text-on-primary: #ffffff;
-    --color-text-on-primary-rgb: 255 255 255;
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
@@ -108,8 +127,7 @@ body.theme-light {
 
 /* Re-declarar variables derivadas en el scope de body.theme-light
    para que dependencias como --color-card-bg se resuelvan con los
-   valores del tema claro en lugar de tomar los valores calculados
-   en :root (que apuntan al tema oscuro por defecto). */
+   valores del tema claro. */
 body.theme-light {
     --color-card-bg: var(--color-surface);
     --color-card-border: var(--color-border);
@@ -120,6 +138,7 @@ body.theme-light {
     --color-skeleton-mid: rgb(var(--color-border-rgb) / 0.7);
 }
 
+/* Estilos específicos del tema claro para el header */
 body.theme-light .dashboard-header {
     background: #ffffff;
     color: var(--color-text-primary);
@@ -137,298 +156,4 @@ body.theme-light .header-title {
 
 body.theme-light .header-subtitle {
     color: var(--color-text-secondary);
-}
-
-body.theme-light .btn-refresh,
-body.theme-light .theme-toggle,
-body.theme-light .user-avatar-toggle {
-    background: rgb(var(--color-border-rgb) / 0.1);
-    border: 1px solid rgb(var(--color-border-rgb) / 0.2);
-    color: var(--color-text-primary);
-}
-
-body.theme-light .btn-refresh:hover,
-body.theme-light .theme-toggle:hover,
-body.theme-light .user-avatar-toggle:hover,
-body.theme-light .btn-refresh:focus-visible,
-body.theme-light .theme-toggle:focus-visible,
-body.theme-light .user-avatar-toggle:focus-visible {
-    background: rgb(var(--color-border-rgb) / 0.15);
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-}
-
-* {
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: var(--color-bg);
-    color: var(--color-text-primary);
-    min-height: 100vh;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    background-image:
-        radial-gradient(ellipse at 20% 50%, rgb(var(--color-primary-rgb) / 0.15) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 20%, rgb(var(--color-accent-rgb) / 0.08) 0%, transparent 60%);
-    background-attachment: fixed;
-    transition: background-color var(--transition-smooth), color var(--transition-smooth);
-}
-
-body.theme-light {
-    background-image: none;
-}
-
-.skip-link {
-    position: absolute;
-    top: -100px;
-    left: 1rem;
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-    padding: 0.5rem 1rem;
-    z-index: 9999;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    text-decoration: none;
-    transition: top var(--transition-fast);
-}
-
-.skip-link:focus {
-    top: 1rem;
-}
-
-/* ─── HEADER ─── */
-.dashboard-header {
-    background: var(--color-primary);
-    color: var(--color-text-on-primary);
-    border-bottom: 1px solid rgb(var(--color-text-on-primary-rgb) / 0.1);
-    padding: 1rem 1.5rem;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    transition: background-color var(--transition-smooth), color var(--transition-smooth);
-}
-
-.header-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.5rem;
-    max-width: 100%;
-}
-
-.header-logo {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    flex: 1;
-}
-
-.header-logo-icon {
-    width: 48px;
-    height: 48px;
-    background: rgb(var(--color-text-on-primary-rgb) / 0.15);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--color-accent);
-    flex-shrink: 0;
-}
-
-.header-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--color-text-on-primary);
-    letter-spacing: -0.01em;
-}
-
-.header-subtitle {
-    font-size: 0.85rem;
-    margin: 0.25rem 0 0 0;
-    color: rgb(var(--color-text-on-primary-rgb) / 0.7);
-    font-weight: 400;
-}
-
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.dashboard-footer {
-    text-align: center;
-    padding: 1rem;
-    color: var(--color-text-muted);
-    font-size: 0.85rem;
-    border-top: 1px solid var(--color-border);
-    margin-top: 3rem;
-}
-
-.dashboard-footer p {
-    margin: 0;
-}
-
-.btn-refresh,
-.theme-toggle,
-.user-avatar-toggle {
-    background: rgb(var(--color-text-on-primary-rgb) / 0.06);
-    border: 1px solid rgb(var(--color-text-on-primary-rgb) / 0.16);
-    color: var(--color-text-on-primary);
-    transition: all var(--transition-fast);
-}
-
-.btn-refresh,
-.theme-toggle,
-.user-avatar-toggle {
-    /* Usar el color de texto principal para asegurar legibilidad en ambos temas */
-    background: rgb(var(--color-border-rgb) / 0.06);
-    border: 1px solid rgb(var(--color-border-rgb) / 0.16);
-    color: var(--color-text-primary);
-    transition: all var(--transition-fast);
-}
-.btn-refresh:hover,
-.theme-toggle:hover,
-.user-avatar-toggle:hover,
-.btn-refresh:focus-visible,
-.theme-toggle:focus-visible,
-.user-avatar-toggle:focus-visible {
-    background: rgb(var(--color-border-rgb) / 0.12);
-    border-color: var(--color-accent);
-    color: var(--color-accent);
-    box-shadow: var(--shadow-glow-orange);
-}
-
-.user-avatar-toggle {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.95rem;
-    font-weight: 800;
-    text-decoration: none;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.user-avatar-toggle::after {
-    display: none;
-}
-
-.user-avatar-toggle-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-}
-
-.crm-user-menu {
-    min-width: 220px;
-    padding: 0.75rem;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-lg);
-}
-
-.crm-user-menu-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.25rem 0.75rem 0.75rem;
-    color: var(--color-text-primary);
-}
-
-.crm-user-menu-header i {
-    font-size: 1.6rem;
-    color: var(--color-accent);
-}
-
-.crm-user-menu-header strong {
-    display: block;
-    font-size: 0.95rem;
-}
-
-.crm-user-menu-header span {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-}
-
-.crm-user-menu .dropdown-item {
-    color: var(--color-text-primary);
-    border-radius: 0.6rem;
-    padding: 0.6rem 0.75rem;
-    transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.crm-user-menu .dropdown-item:hover,
-.crm-user-menu .dropdown-item:focus {
-    background: var(--color-surface-hover);
-    color: var(--color-accent);
-}
-
-.crm-user-menu .dropdown-item.disabled,
-.crm-user-menu .dropdown-item:disabled {
-    color: var(--color-text-muted);
-    pointer-events: none;
-    opacity: 0.7;
-}
-
-.crm-user-menu .dropdown-divider {
-    border-top-color: var(--color-border);
-    opacity: 1;
-}
-
-.crm-modal-content {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
-}
-
-.crm-modal-content .modal-header,
-.crm-modal-content .modal-footer {
-    border-color: var(--color-border);
-}
-
-.crm-modal-content .modal-title {
-    color: var(--color-accent);
-}
-
-.crm-modal-content .form-control,
-.crm-modal-content .form-select,
-.crm-modal-content textarea,
-.crm-modal-content input {
-    background: var(--color-surface-hover);
-    color: var(--color-text-primary);
-    border-color: var(--color-border);
-}
-
-.crm-modal-content .form-control::placeholder,
-.crm-modal-content textarea::placeholder,
-.crm-modal-content input::placeholder {
-    color: var(--color-text-muted);
-}
-
-.crm-modal-content .form-control:focus,
-.crm-modal-content .form-select:focus,
-.crm-modal-content textarea:focus,
-.crm-modal-content input:focus {
-    background: var(--color-surface-hover);
-    color: var(--color-text-primary);
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 0.2rem rgb(var(--color-accent-rgb) / 0.15);
 }

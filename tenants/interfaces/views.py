@@ -23,8 +23,8 @@ from tenants.interfaces.serializers import (
 )
 
 
-class TenantViewSet(viewsets.ReadOnlyModelViewSet):
-    """ViewSet de solo lectura para tenants.
+class TenantViewSet(viewsets.ModelViewSet):
+    """ViewSet para tenants (lectura + actualizacion de pipeline).
 
     Attributes:
         queryset: Base de datos de tenants activos.
@@ -86,4 +86,45 @@ class TenantViewSet(viewsets.ReadOnlyModelViewSet):
         target_model = request.query_params.get("target_model", "contact")
         fields = get_custom_fields(tenant, target_model)
         serializer = CustomFieldSerializer(fields, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["get", "patch"], url_path="pipeline-config")
+    def pipeline_config_update(self, request, slug=None):
+        """API unificada de pipeline: GET para leer, PATCH para actualizar.
+
+        GET /api/tenants/{slug}/pipeline-config/
+        PATCH /api/tenants/{slug}/pipeline-config/
+            Body: {"stages": [{"name": "...", "color": "...", "order": 1}, ...]}
+        """
+        tenant = self.get_object()
+        pipeline_config = get_object_or_404(PipelineConfig, tenant=tenant)
+
+        if request.method == "GET":
+            serializer = PipelineConfigSerializer(pipeline_config)
+            return Response(serializer.data)
+
+        stages_data = request.data.get("stages")
+        if not stages_data or not isinstance(stages_data, list):
+            return Response(
+                {"detail": "Se requiere un array 'stages'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated_stages = []
+        for idx, stage in enumerate(stages_data):
+            name = stage.get("name", "").strip()
+            if not name:
+                return Response(
+                    {"detail": f"Etapa {idx + 1} no tiene nombre."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            validated_stages.append({
+                "name": name,
+                "color": stage.get("color", "#003366").strip() or "#003366",
+                "order": int(stage.get("order", idx + 1)),
+            })
+
+        pipeline_config.stages = validated_stages
+        pipeline_config.save(update_fields=["stages"])
+        serializer = PipelineConfigSerializer(pipeline_config)
         return Response(serializer.data)

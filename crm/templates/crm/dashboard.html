@@ -147,7 +147,7 @@
 </div>
 
 <!-- Modal 2: Lead cerrado → etapa activa (error vs recompra) -->
-<div class="modal fade" id="reopenModal" tabindex="-1" aria-labelledby="reopenModalLabel" aria-hidden="true">
+<div class="modal fade" id="reopenModal" tabindex="-1" aria-labelledby="reopenModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog">
         <div class="modal-content crm-modal-content">
             <div class="modal-header">
@@ -155,11 +155,15 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
             </div>
             <div class="modal-body">
-                <p class="mb-0">Este lead está en una etapa cerrada. ¿Qué deseas hacer?</p>
+                <p class="mb-0" style="color: var(--color-text-primary);">Este lead está en una etapa cerrada. ¿Qué deseas hacer?</p>
             </div>
-            <div class="modal-footer" style="gap: .5rem;">
-                <button type="button" id="reopen-error-btn" class="btn btn-outline-light" data-bs-dismiss="modal">Fue un error</button>
-                <button type="button" id="reopen-new-btn" class="btn btn-primary">Nueva oportunidad (recompra)</button>
+            <div class="modal-footer" style="gap: .75rem;">
+                <button type="button" id="reopen-error-btn" class="btn" style="min-width: 130px; background: #f59e0b; color: #000; border-color: #f59e0b; font-weight: 600;">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Fue un error
+                </button>
+                <button type="button" id="reopen-new-btn" class="btn" style="min-width: 160px; background: #10b981; color: #000; border-color: #10b981; font-weight: 600;">
+                    <i class="bi bi-plus-lg me-1"></i>Nueva oportunidad
+                </button>
             </div>
         </div>
     </div>

@@ -11,6 +11,8 @@ from crm.interfaces.views import (
     CrmDashboardTemplateView,
     CrmLeadDetailTemplateView,
     CrmTrashTemplateView,
+    CrmAnalyticsTemplateView,
+    PipelineConfigView,
 )
 
 app_name = "crm_web"
@@ -30,5 +32,15 @@ urlpatterns = [
         "<slug:tenant_slug>/trash/",
         CrmTrashTemplateView.as_view(),
         name="trash",
+    ),
+    path(
+        "<slug:tenant_slug>/analytics/",
+        CrmAnalyticsTemplateView.as_view(),
+        name="analytics",
+    ),
+    path(
+        "<slug:tenant_slug>/config/",
+        PipelineConfigView.as_view(),
+        name="pipeline-config",
     ),
 ]

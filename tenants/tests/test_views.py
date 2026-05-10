@@ -93,3 +93,46 @@ class TenantAPITestCase(TestCase):
         self.tenant.save()
         response = self.client.get("/api/tenants/")
         self.assertEqual(len(response.data), 0)
+
+    def test_update_pipeline(self):
+        """Comprueba que PATCH actualiza las etapas del pipeline."""
+
+        response = self.client.patch(
+            "/api/tenants/codensolar/pipeline-config/",
+            {"stages": [
+                {"name": "Nuevo Lead", "color": "#003366", "order": 1},
+                {"name": "Contactado", "color": "#FF9933", "order": 2},
+                {"name": "Cerrado", "color": "#10b981", "order": 3},
+            ]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["stages"]), 3)
+        self.assertEqual(response.data["stages"][0]["name"], "Nuevo Lead")
+
+    def test_update_pipeline_get(self):
+        """Comprueba que GET del pipeline-config retorna las etapas."""
+
+        response = self.client.get("/api/tenants/codensolar/pipeline-config/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["stages"]), 3)
+
+    def test_update_pipeline_missing_name(self):
+        """Comprueba que PATCH rechaza etapas sin nombre."""
+
+        response = self.client.patch(
+            "/api/tenants/codensolar/pipeline-config/",
+            {"stages": [{"name": "", "color": "#003366", "order": 1}]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_pipeline_missing_stages(self):
+        """Comprueba que PATCH rechaza cuando no hay array stages."""
+
+        response = self.client.patch(
+            "/api/tenants/codensolar/pipeline-config/",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

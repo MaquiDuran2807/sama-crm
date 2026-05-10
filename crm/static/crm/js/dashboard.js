@@ -1,11 +1,11 @@
 /**
  * crm/static/crm/js/dashboard.js
- * Dashboard Kanban del CRM SAMA AdTech
+ * Funciones específicas del Dashboard Kanban CRM SAMA AdTech.
+ * NO incluye theme toggle (está en theme.js).
  *
  * Funcionalidades:
- * - Filtrado de leads en tiempo real
+ * - Filtrado de leads en tiempo real (search)
  * - Drag & Drop con nota obligatoria + modal de etapa cerrada
- * - Tema claro/oscuro con persistencia en localStorage
  * - Actualización de contadores y estadísticas dinámicas
  */
 
@@ -15,7 +15,6 @@
     // ─── CONFIGURACIÓN ───
     var CONFIG = {
         API_BASE: '/api/crm/leads/',
-        THEME_STORAGE_KEY: 'sama-crm-theme',
         DRAG_FEEDBACK_CLASS: 'dragging',
         DRAG_OVER_CLASS: 'drag-over',
     };
@@ -24,23 +23,9 @@
 
     // Estado de la operación de drag pendiente
     var pendingDrag = null;
+    var recompraInProgress = false;
 
     // ─── HELPERS ───
-    function getCookie(name) {
-        var value = null;
-        if (document.cookie && document.cookie !== '') {
-            var cookies = document.cookie.split(';');
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    value = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return value;
-    }
-
     function isClosedStage(stageName) {
         var name = (stageName || '').toLowerCase();
         return name.indexOf('cerrado') !== -1 || name.indexOf('closed') !== -1;
@@ -56,17 +41,13 @@
     function showModal(modalId) {
         var modalEl = document.getElementById(modalId);
         if (!modalEl) return;
-        var modal = new bootstrap.Modal(modalEl);
+        var modal = new bootstrap.Modal(modalId);
         modal.show();
-    }
-
-    function getTenantSlug() {
-        return document.body.getAttribute('data-tenant-slug');
     }
 
     // ─── STATS REFRESH ───
     function refreshStats() {
-        var tenantSlug = getTenantSlug();
+        var tenantSlug = SAMA.getTenantSlug ? SAMA.getTenantSlug() : document.body.getAttribute('data-tenant-slug');
         if (!tenantSlug) return;
 
         var url = CONFIG.API_BASE + 'stats/?tenant_slug=' + encodeURIComponent(tenantSlug);
@@ -89,40 +70,6 @@
             .catch(function(error) {
                 console.error('Error al refrescar estadísticas:', error);
             });
-    }
-
-    // ─── THEME ───
-    function initThemeToggle() {
-        var toggle = document.getElementById('theme-toggle');
-        if (!toggle) return;
-
-        var savedTheme = localStorage.getItem(CONFIG.THEME_STORAGE_KEY) || 'dark';
-        applyTheme(savedTheme);
-
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            var current = document.body.classList.contains('theme-light') ? 'light' : 'dark';
-            applyTheme(current === 'dark' ? 'light' : 'dark');
-        });
-    }
-
-    function applyTheme(theme) {
-        var isLight = theme === 'light';
-        document.body.classList.toggle('theme-light', isLight);
-        localStorage.setItem(CONFIG.THEME_STORAGE_KEY, theme);
-
-        var toggle = document.getElementById('theme-toggle');
-        if (!toggle) return;
-        var icon = toggle.querySelector('i');
-        if (icon) {
-            if (isLight) {
-                icon.className = 'bi bi-moon-stars';
-                toggle.setAttribute('aria-label', 'Cambiar a tema oscuro');
-            } else {
-                icon.className = 'bi bi-sun';
-                toggle.setAttribute('aria-label', 'Cambiar a tema claro');
-            }
-        }
     }
 
     // ─── SEARCH ───
@@ -288,16 +235,19 @@
 
         saveBtn.addEventListener('click', function() {
             var note = document.getElementById('drag-note-text').value.trim();
-            var tenantSlug = getTenantSlug();
+            var tenantSlug = SAMA.getTenantSlug();
+
+            if (!pendingDrag) return;
+
+            var isLeadClosed = pendingDrag.card && pendingDrag.card.getAttribute('data-is-closed') === 'true';
+            var isMovingToActive = !isClosedStage(pendingDrag.newStage);
 
             hideModal('noteModal');
 
             if (!note) {
-                // Sin nota: solo hacer el movimiento si no es cerrado→activo
-                if (!pendingDrag) return;
-
-                if (isClosedStage(pendingDrag.sourceStage) && !isClosedStage(pendingDrag.newStage)) {
-                    // Sin nota pero es cerrado→activo: mostrar modal de error/recompra
+                // Sin nota
+                if (isLeadClosed && isMovingToActive) {
+                    // Lead cerrado movido a etapa activa: mostrar modal
                     document.getElementById('drag-note-text').value = '';
                     showModal('reopenModal');
                 } else {
@@ -306,9 +256,9 @@
                     pendingDrag = null;
                 }
             } else {
-                // Con nota: hacer el movimiento y guardar la nota
-                if (isClosedStage(pendingDrag.sourceStage) && !isClosedStage(pendingDrag.newStage)) {
-                    // Con nota + cerrado→activo: guardar nota y mostrar reopen
+                // Con nota
+                if (isLeadClosed && isMovingToActive) {
+                    // Con nota + lead cerrado → activo: guardar nota y mostrar reopen
                     document.getElementById('drag-note-text').value = '';
                     pendingDrag.note = note;
                     showModal('reopenModal');
@@ -368,7 +318,7 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
+                'X-CSRFToken': SAMA.getCookie('csrftoken'),
             },
             body: JSON.stringify({ note: note }),
         })
@@ -399,7 +349,7 @@
         });
 
         modalEl.addEventListener('hidden.bs.modal', function() {
-            if (pendingDrag) {
+            if (pendingDrag && !recompraInProgress) {
                 revertCard(pendingDrag.card, pendingDrag.sourceCol);
                 pendingDrag = null;
             }
@@ -437,7 +387,7 @@
 
             var select = document.getElementById('error-stage-select');
             var targetStage = select ? select.value : pendingDrag.newStage;
-            var tenantSlug = getTenantSlug();
+            var tenantSlug = SAMA.getTenantSlug();
 
             hideModal('errorRestoreModal');
             hideModal('reopenModal');
@@ -478,11 +428,13 @@
 
             var product = document.getElementById('recompra-product').value.trim();
             var notes = document.getElementById('recompra-notes').value.trim();
-            var tenantSlug = getTenantSlug();
+            var tenantSlug = SAMA.getTenantSlug();
             var leadId = pendingDrag.leadId;
+            var originalCard = pendingDrag.card;
+
+            recompraInProgress = true;
 
             hideModal('recompraModal');
-            hideModal('reopenModal');
 
             // Primero: si hay nota, guardarla en el lead original
             if (pendingDrag.note) {
@@ -506,11 +458,19 @@
             })
             .then(function(data) {
                 pendingDrag = null;
+                recompraInProgress = false;
+                // Refresh stats and reload to show new lead
+                setTimeout(refreshStats, 300);
                 location.reload();
             })
             .catch(function(error) {
                 console.error('Error en recompra:', error);
                 pendingDrag = null;
+                recompraInProgress = false;
+                // Revert the card if there was an error
+                if (originalCard) {
+                    revertCard(originalCard, pendingDrag ? pendingDrag.sourceCol : null);
+                }
                 location.reload();
             });
         });
@@ -530,13 +490,14 @@
 
     // ─── INIT ───
     function init() {
+        // Solo inicializar si estamos en el dashboard (existe lead-search)
+        if (!document.getElementById('lead-search')) return;
+
         DOM.searchInput = document.getElementById('lead-search');
         DOM.searchClear = document.getElementById('search-clear');
         DOM.leadCards = document.querySelectorAll('.lead-card');
         DOM.kanbanColumns = document.querySelectorAll('.kanban-column');
-        DOM.themeToggle = document.getElementById('theme-toggle');
 
-        initThemeToggle();
         initSearch();
         initDragDrop();
         initNoteModal();

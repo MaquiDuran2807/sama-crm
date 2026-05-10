@@ -1,0 +1,15 @@
+.shell { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+.cardx { background: var(--color-card-bg); border: 1px solid var(--color-card-border); border-radius: 18px; padding: 1.25rem; box-shadow: var(--shadow-lg); }
+.eyebrow { color: var(--color-accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; }
+.muted { color: var(--color-text-muted); }
+.pill { display:inline-block; padding:.25rem .7rem; border-radius:999px; background: var(--color-accent-soft); color: var(--color-accent-light); font-size:.8rem; }
+.timeline-item { border-left: 2px solid var(--color-border); padding-left: 1rem; margin-left: .4rem; margin-bottom: 1rem; }
+.timeline-item::before { content:''; width:10px; height:10px; border-radius:50%; background: var(--color-accent); display:inline-block; margin-left:-1.45rem; margin-right:.6rem; }
+.stage-node { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; }
+.trace-bar { display: flex; align-items: center; margin: 1rem 0; }
+.trace-step { display: flex; align-items: center; }
+.trace-line { width: 30px; height: 2px; background: var(--color-border); }
+.trace-active { background: var(--color-accent) !important; }
+.source-link { color: var(--color-accent); font-size: .82rem; }
+.source-link:hover { opacity: 0.8; }
+#lead-content { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
