@@ -13,3 +13,20 @@
 .source-link { color: var(--color-accent); font-size: .82rem; }
 .source-link:hover { opacity: 0.8; }
 #lead-content { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem 3rem; }
+
+.lead-tag-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.lead-tag-detail .tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}

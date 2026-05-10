@@ -1,5 +1,6 @@
 from django.db import models
-from tenants.models import Tenant  # Asume que la app tenants ya está instalada
+from django.utils import timezone
+from tenants.models import Tenant
 
 
 class Contact(models.Model):
@@ -9,7 +10,8 @@ class Contact(models.Model):
     phone_number = models.CharField(max_length=32, blank=True, db_index=True)
     email = models.EmailField(blank=True)
     address = models.TextField(blank=True)
-    city = models.CharField(max_length=100, blank=True)
+    city = models.ForeignKey("City", on_delete=models.SET_NULL, null=True, blank=True, related_name="contacts")
+    region = models.CharField(max_length=100, blank=True)
 
     # Origen del contacto
     utm_source = models.CharField(max_length=50, blank=True)
@@ -20,7 +22,7 @@ class Contact(models.Model):
     # Datos personalizados (definidos por el tenant en CustomField)
     custom_fields = models.JSONField(default=dict)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -65,6 +67,7 @@ class Lead(models.Model):
     skipped_stages = models.JSONField(default=list)
     is_closed = models.BooleanField(default=False)
     closed_result = models.CharField(max_length=20, blank=True)  # 'won' o 'lost'
+    is_recompra = models.BooleanField(default=False, db_index=True)
 
     custom_fields = models.JSONField(default=dict)
 
@@ -73,7 +76,7 @@ class Lead(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.CharField(max_length=100, blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True)
 
@@ -111,7 +114,7 @@ class LeadSource(models.Model):
     referrer_contact = models.ForeignKey(Contact, null=True, blank=True, on_delete=models.SET_NULL, related_name="referred_leads")
     landing_page_url = models.URLField(blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     PLATFORM_ICONS = {
         "meta": "bi-facebook",
@@ -136,7 +139,7 @@ class LeadActivity(models.Model):
     description = models.TextField()
     performed_by = models.CharField(max_length=100, default="system")
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ["-created_at"]
@@ -156,7 +159,7 @@ class DailyFollowupReport(models.Model):
     date = models.DateField()
     target_leads = models.JSONField(default=list, help_text="Lista de lead_ids a seguir")
     summary = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
         ordering = ["-date", "-report_type"]
@@ -164,3 +167,71 @@ class DailyFollowupReport(models.Model):
 
     def __str__(self):
         return f"Reporte {self.report_type} - {self.date}"
+    
+class LeadTask(models.Model):
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="tasks")
+    description = models.CharField(max_length=255)
+    due_date = models.DateTimeField(null=True, blank=True)
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Task: {self.description} ({self.lead})"
+
+
+class Department(models.Model):
+    """Departamento geografico para agrupar ciudades."""
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        verbose_name_plural = "Departments"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class City(models.Model):
+    """Ciudad asociada a un departamento."""
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name="cities")
+    name = models.CharField(max_length=100)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    class Meta:
+        unique_together = ["department", "name"]
+        ordering = ["department__name", "name"]
+
+    def __str__(self):
+        return f"{self.name}, {self.department.name}"
+
+
+class Tag(models.Model):
+    """Etiqueta para categorizar leads."""
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="tags")
+    name = models.CharField(max_length=50)
+    color = models.CharField(max_length=7, default="#3498db")
+    is_predefined = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ["tenant", "name"]
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.tenant.name} / {self.name}"
+
+
+class LeadTag(models.Model):
+    """Relacion many-to-many entre Lead y Tag."""
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="lead_tags")
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE, related_name="lead_tags")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        unique_together = ["lead", "tag"]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Lead {self.lead_id} - Tag {self.tag_id}"

@@ -10,8 +10,8 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 1rem;
-    margin-bottom: 2rem;
-    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    padding: 0.9rem 1.25rem;
     background: var(--color-card-bg);
     border: 1px solid var(--color-card-border);
     border-radius: 14px;
@@ -52,11 +52,11 @@
 
 .current-period {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     color: var(--color-text-primary);
-    min-width: 140px;
+    min-width: 150px;
     text-align: center;
-    padding: 0.3rem 0.6rem;
+    padding: 0.3rem 0.7rem;
     border-radius: 8px;
     background: var(--color-surface);
     border: 1px solid var(--color-card-border);
@@ -67,22 +67,8 @@
     gap: 0.4rem;
 }
 
-.filter-bar label {
-    color: var(--color-text-secondary);
-    font-size: 0.82rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.4rem;
-}
-
-.range-buttons {
-    display: flex;
-    gap: 0.5rem;
-}
-
 .range-btn {
-    padding: 0.35rem 0.9rem;
+    padding: 0.35rem 0.85rem;
     border-radius: 8px;
     border: 1px solid var(--color-card-border);
     background: var(--color-surface);
@@ -111,16 +97,16 @@
 
 .summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0.75rem;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .summary-card {
     background: var(--color-card-bg);
     border: 1px solid var(--color-card-border);
     border-radius: 14px;
-    padding: 1.25rem 1.5rem;
+    padding: 1.1rem 1.25rem;
     position: relative;
     overflow: hidden;
     transition: all var(--transition-smooth);
@@ -140,9 +126,11 @@
 .summary-card.conversion::before { background: var(--color-success); }
 .summary-card.avg-days::before { background: var(--color-warning); }
 .summary-card.week::before { background: var(--color-accent); }
+.summary-card.won::before { background: var(--color-success); }
+.summary-card.lost::before { background: var(--color-danger); }
 
 .summary-value {
-    font-size: 2rem;
+    font-size: 1.9rem;
     font-weight: 800;
     color: var(--color-text-primary);
     letter-spacing: -0.02em;
@@ -150,17 +138,18 @@
 }
 
 .summary-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
     font-weight: 500;
     margin-top: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
-.charts-row {
+.charts-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
-    margin-bottom: 1.5rem;
 }
 
 .chart-card {
@@ -171,23 +160,127 @@
 }
 
 .chart-title {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
-    color: var(--color-text-primary);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     margin-bottom: 1rem;
 }
 
-.chart-wrapper { position: relative; }
+.chart-wrapper {
+    position: relative;
+    min-height: 200px;
+}
 
 .chart-full {
     background: var(--color-card-bg);
     border: 1px solid var(--color-card-border);
     border-radius: 14px;
     padding: 1.25rem;
-    margin-bottom: 1rem;
+    margin-top: 0.75rem;
 }
+
+.funnel-summary {
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    margin-top: 0.75rem;
+    font-weight: 500;
+}
+
+/* Region table */
+.table-responsive { max-height: 380px; overflow-y: auto; }
+.table-responsive::-webkit-scrollbar { width: 4px; }
+.table-responsive::-webkit-scrollbar-thumb { background: var(--color-card-border); border-radius: 4px; }
+
+.region-table {
+    font-size: 0.85rem;
+    color: var(--color-text-primary);
+}
+
+.region-table thead th {
+    background: var(--color-surface);
+    border-bottom: 2px solid var(--color-card-border);
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.region-table tbody td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--color-card-border);
+    vertical-align: middle;
+}
+
+.region-table tbody tr:hover { background: var(--color-surface-hover); }
+
+.conv-bar-cell { width: 80px; }
+
+.conv-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-card-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.conv-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    background: var(--color-accent);
+}
+
+.conv-pct {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-top: 0.15rem;
+}
+
+/* Colombia map */
+.map-container {
+    position: relative;
+    max-height: 420px;
+    overflow: hidden;
+}
+
+.col-map-svg {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+}
+
+.col-map-svg path {
+    stroke: var(--color-border);
+    stroke-width: 0.5;
+    cursor: pointer;
+    transition: fill 0.2s, opacity 0.2s;
+}
+
+.col-map-svg path:hover { opacity: 0.85; }
+
+.map-tooltip {
+    position: absolute;
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    color: var(--color-text-primary);
+    pointer-events: none;
+    display: none;
+    box-shadow: var(--shadow-md);
+    z-index: 100;
+}
+
+.map-tooltip strong { color: var(--color-accent); }
 
 .loading-overlay {
     display: flex;
@@ -197,26 +290,21 @@
     color: var(--color-text-muted);
 }
 
-.loading-overlay i {
-    font-size: 2rem;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
+.loading-overlay i { font-size: 2rem; animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @media (max-width: 1024px) {
-    .charts-row { grid-template-columns: 1fr; }
+    .charts-grid-2 { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
     .analytics-page { padding: 1rem; }
     .filter-bar { flex-direction: column; align-items: stretch; }
-    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+    .summary-cards { grid-template-columns: repeat(3, 1fr); }
+    .filter-left, .filter-right { flex-wrap: wrap; }
 }
 
 @media (max-width: 480px) {
-    .summary-cards { grid-template-columns: 1fr; }
+    .summary-cards { grid-template-columns: repeat(2, 1fr); }
+    .view-toggles { flex-wrap: wrap; }
 }

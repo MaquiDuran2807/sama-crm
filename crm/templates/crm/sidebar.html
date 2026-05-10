@@ -1,0 +1,133 @@
+<aside class="sama-sidebar" id="sama-sidebar" aria-label="Panel de filtros">
+    <div class="sidebar-header">
+        <h2 class="sidebar-title">
+            <i class="bi bi-funnel me-2"></i>Filtros
+        </h2>
+        <button type="button" class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Cerrar panel">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+
+    <div class="sidebar-body" data-tenant-slug="{{ tenant.slug }}">
+        <!-- Periodo rapido -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Período rápido</h3>
+            <div class="filter-period-btns" role="group" aria-label="Selección de período">
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-hoy" value="hoy" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="period-hoy">Hoy</label>
+
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-ayer" value="ayer" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="period-ayer">Ayer</label>
+
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-7d" value="7d" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="period-7d">Últ. 7 días</label>
+
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-30d" value="30d" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="period-30d">Últ. 30 días</label>
+
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-mes" value="mes" autocomplete="off">
+                <label class="btn btn-outline-primary btn-sm" for="period-mes">Este mes</label>
+
+                <input type="radio" class="btn-check" name="quickPeriod" id="period-todo" value="todo" autocomplete="off" checked>
+                <label class="btn btn-outline-primary btn-sm" for="period-todo">Todo</label>
+            </div>
+        </section>
+
+        <!-- Rango personalizado -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Rango personalizado</h3>
+            <div class="row g-2 mb-2">
+                <div class="col-6">
+                    <label for="filter-date-from" class="form-label small">Desde</label>
+                    <input type="date" id="filter-date-from" class="form-control form-control-sm">
+                </div>
+                <div class="col-6">
+                    <label for="filter-date-to" class="form-label small">Hasta</label>
+                    <input type="date" id="filter-date-to" class="form-control form-control-sm">
+                </div>
+            </div>
+        </section>
+
+        <!-- Etapas -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Etapas</h3>
+            <div class="filter-checkboxes" id="stage-filter-checkboxes">
+                {% for stage in pipeline %}
+                <div class="form-check">
+                    <input class="form-check-input stage-filter" type="checkbox"
+                           value="{{ stage.name }}" id="stage-{{ forloop.counter }}"
+                           checked data-stage-color="{{ stage.color }}">
+                    <label class="form-check-label" for="stage-{{ forloop.counter }}">
+                        <span class="stage-dot" style="background:{{ stage.color }};"></span>
+                        {{ stage.name }}
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Fuente -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Fuente</h3>
+            <select id="filter-source" class="form-select form-select-sm">
+                <option value="">Todas las fuentes</option>
+                <option value="meta">Meta</option>
+                <option value="google">Google Ads</option>
+                <option value="tiktok">TikTok</option>
+                <option value="web">Página web</option>
+                <option value="referral">Referido</option>
+            </select>
+        </section>
+
+        <!-- Estado -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Estado</h3>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="filter-open-only" value="true">
+                <label class="form-check-label" for="filter-open-only">Solo abiertos</label>
+            </div>
+        </section>
+
+        <!-- Etiquetas -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Etiquetas</h3>
+            <div class="filter-tags-list" id="sidebar-tags-list">
+                <div class="text-muted small">Cargando...</div>
+            </div>
+        </section>
+
+        <!-- Tareas -->
+        <section class="filter-section">
+            <h3 class="filter-section-title">Tareas</h3>
+            <div class="filter-task-btns" role="group" aria-label="Filtros de tareas">
+                <button type="button" class="btn btn-outline-primary btn-sm task-filter-btn" data-task-filter="with_pending">
+                    Con tareas pendientes <span class="badge bg-secondary ms-1">0</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm task-filter-btn" data-task-filter="due_today">
+                    Vencen hoy <span class="badge bg-secondary ms-1">0</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm task-filter-btn" data-task-filter="due_tomorrow">
+                    Mañana <span class="badge bg-secondary ms-1">0</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm task-filter-btn" data-task-filter="overdue">
+                    Vencidas <span class="badge bg-secondary ms-1">0</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm task-filter-btn" data-task-filter="none">
+                    Sin tareas <span class="badge bg-secondary ms-1">0</span>
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <div class="sidebar-footer">
+        <button type="button" class="btn btn-primary w-100" id="apply-filters-btn">
+            <i class="bi bi-check2 me-1"></i>Aplicar filtros
+        </button>
+        <button type="button" class="btn btn-outline-secondary w-100 mt-2" id="clear-filters-btn">
+            <i class="bi bi-x-lg me-1"></i>Limpiar
+        </button>
+    </div>
+</aside>
+
+<!-- Overlay para mobile -->
+<div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>

@@ -245,7 +245,7 @@ def _next_available_stage(
 
 
 def create_reopen_lead(original_lead: Lead, first_stage: str, performed_by: str = "system") -> Lead:
-    """Crea un nuevo lead como reapertura (recompra) de uno cerrado.
+    """Crea un nuevo lead como reopening (recompra) de uno cerrado.
 
     El lead original permanece intacto en su etapa cerrada. El nuevo lead
     se crea en la primera etapa del pipeline con los datos del contacto
@@ -265,6 +265,7 @@ def create_reopen_lead(original_lead: Lead, first_stage: str, performed_by: str 
         current_stage=first_stage,
         product_of_interest=original_lead.product_of_interest,
         product_category=original_lead.product_category,
+        is_recompra=True,
     )
     LeadActivity.objects.create(
         lead=new_lead,

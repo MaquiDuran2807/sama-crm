@@ -44,25 +44,6 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
             });
     };
 
-    document.addEventListener('DOMContentLoaded', function() {
-        var modal = document.getElementById('activityModal');
-        if (!modal) return;
-        var saveBtn = modal.querySelector('#save-activity-btn');
-        var textarea = modal.querySelector('#activity-description');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function() {
-                var desc = textarea.value.trim();
-                if (!desc) return;
-                apiCall(apiBase + '/add_activity/' + apiQuery, 'POST', { description: desc })
-                    .then(function() {
-                        var modalObj = bootstrap.Modal.getInstance(modal);
-                        if (modalObj) modalObj.hide();
-                        location.reload();
-                    });
-            });
-        }
-    });
-
     window.addActivity = function() {
         var modal = document.getElementById('activityModal');
         if (!modal) return;
@@ -80,32 +61,46 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         }
     };
 
-    document.addEventListener('DOMContentLoaded', function() {
-        var confirmBtn = document.getElementById('confirm-delete-btn-detail');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function() {
-                var url = '/api/crm/leads/' + leadId + '/?tenant_slug=' + encodeURIComponent(tenantSlug);
-
-                fetch(url, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': csrfToken,
-                    },
-                })
-                .then(function(response) {
-                    if (response.ok || response.status === 204) {
-                        var modal = bootstrap.Modal.getInstance(document.getElementById('deleteLeadModal'));
-                        if (modal) modal.hide();
-                        window.location.href = '/crm/' + tenantSlug + '/dashboard/';
-                    } else {
-                        alert('Error al eliminar lead');
-                    }
-                })
-                .catch(function(error) {
-                    console.error('Error:', error);
-                    alert('Error al eliminar lead');
+    var modal = document.getElementById('activityModal');
+    var saveBtn = modal ? modal.querySelector('#save-activity-btn') : null;
+    var textarea = modal ? modal.querySelector('#activity-description') : null;
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            var desc = textarea.value.trim();
+            if (!desc) return;
+            apiCall(apiBase + '/add_activity/' + apiQuery, 'POST', { description: desc })
+                .then(function() {
+                    var modalInstance = bootstrap.Modal.getInstance(modal);
+                    if (modalInstance) modalInstance.hide();
+                    location.reload();
                 });
+        });
+    }
+
+    var confirmBtn = document.getElementById('confirm-delete-btn-detail');
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', function() {
+            var url = '/api/crm/leads/' + leadId + '/?tenant_slug=' + encodeURIComponent(tenantSlug);
+
+            fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                },
+            })
+            .then(function(response) {
+                if (response.ok || response.status === 204) {
+                    var modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteLeadModal'));
+                    if (modalInstance) modalInstance.hide();
+                    window.location.href = '/crm/' + tenantSlug + '/dashboard/';
+                } else {
+                    alert('Error al eliminar lead');
+                }
+            })
+            .catch(function(error) {
+                console.error('Error:', error);
+                alert('Error al eliminar lead');
             });
-        }
-    });
+        });
+    }
 }

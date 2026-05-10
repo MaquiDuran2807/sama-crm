@@ -21,7 +21,45 @@
 
     var DOM = {};
 
-    // Estado de la operación de drag pendiente
+    var sidebarOpen = false;
+
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sama-sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        console.log('[SAMA] toggleSidebar called');
+        console.log('[SAMA] sidebar element:', sidebar);
+        console.log('[SAMA] overlay element:', overlay);
+        if (!sidebar) {
+            console.error('[SAMA] sidebar not found!');
+            return;
+        }
+
+        sidebarOpen = !sidebarOpen;
+        console.log('[SAMA] sidebarOpen:', sidebarOpen);
+        if (sidebarOpen) {
+            sidebar.classList.add('open');
+            document.body.classList.add('sidebar-open');
+            if (overlay) overlay.classList.add('visible');
+            console.log('[SAMA] sidebar opened - classes:', sidebar.className);
+        } else {
+            sidebar.classList.remove('open');
+            document.body.classList.remove('sidebar-open');
+            if (overlay) overlay.classList.remove('visible');
+            console.log('[SAMA] sidebar closed - classes:', sidebar.className);
+        }
+    }
+
+    function closeSidebar() {
+        var sidebar = document.getElementById('sama-sidebar');
+        var overlay = document.getElementById('sidebar-overlay');
+        if (!sidebar) return;
+
+        sidebarOpen = false;
+        sidebar.classList.remove('open');
+        document.body.classList.remove('sidebar-open');
+        if (overlay) overlay.classList.remove('visible');
+    }
+
     var pendingDrag = null;
     var recompraInProgress = false;
 
@@ -29,6 +67,11 @@
     function isClosedStage(stageName) {
         var name = (stageName || '').toLowerCase();
         return name.indexOf('cerrado') !== -1 || name.indexOf('closed') !== -1;
+    }
+
+    function getCookie(name) {
+        var cookie = document.cookie.split(';').find(function(c) { return c.trim().startsWith(name + '='); });
+        return cookie ? cookie.split('=')[1] : '';
     }
 
     function hideModal(modalId) {
@@ -39,10 +82,14 @@
     }
 
     function showModal(modalId) {
-        var modalEl = document.getElementById(modalId);
+        var modalEl = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
         if (!modalEl) return;
-        var modal = new bootstrap.Modal(modalId);
-        modal.show();
+        var instance = bootstrap.Modal.getInstance(modalEl);
+        if (instance) {
+            instance.show();
+        } else {
+            new bootstrap.Modal(modalEl).show();
+        }
     }
 
     // ─── STATS REFRESH ───
@@ -122,6 +169,308 @@
         var searchClear = document.getElementById('search-clear');
         if (searchClear) searchClear.style.display = query ? '' : 'none';
 
+updateColumnCounts();
+    }
+
+    function initSidebar() {
+        console.log('[SAMA] initSidebar called');
+        var toggleBtn = document.getElementById('sidebar-toggle-btn');
+        var closeBtn = document.getElementById('sidebar-close-btn');
+        var overlay = document.getElementById('sidebar-overlay');
+        var applyBtn = document.getElementById('apply-filters-btn');
+        var clearBtn = document.getElementById('clear-filters-btn');
+        console.log('[SAMA] toggleBtn:', toggleBtn);
+        console.log('[SAMA] closeBtn:', closeBtn);
+        console.log('[SAMA] overlay:', overlay);
+        console.log('[SAMA] applyBtn:', applyBtn);
+
+        if (toggleBtn) toggleBtn.addEventListener('click', toggleSidebar);
+        if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+        if (overlay) overlay.addEventListener('click', closeSidebar);
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function() {
+                console.log('[SAMA] Apply filters clicked');
+                applyFilters();
+                closeSidebar();
+            });
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function() {
+                console.log('[SAMA] Clear filters clicked');
+                clearFilters();
+            });
+        }
+        loadTags();
+
+        document.querySelectorAll('.task-filter-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var current = document.querySelector('.task-filter-btn.active');
+                if (current === btn) {
+                    btn.classList.remove('active');
+                } else {
+                    if (current) current.classList.remove('active');
+                    btn.classList.add('active');
+                }
+                applyFilters();
+            });
+        });
+    }
+
+    function getFilterValues() {
+        var stages = [];
+        document.querySelectorAll('.stage-filter:checked').forEach(function(cb) {
+            stages.push(cb.value);
+        });
+
+        var source = document.getElementById('filter-source');
+        var checkedPeriod = document.querySelector('input[name="quickPeriod"]:checked');
+        var taskFilter = document.querySelector('.task-filter-btn.active');
+        var openOnly = document.getElementById('filter-open-only');
+        var tagIds = [];
+        document.querySelectorAll('.tag-filter:checked').forEach(function(cb) {
+            tagIds.push(cb.value);
+        });
+
+        return {
+            stages: stages,
+            source: source ? source.value : '',
+            period: checkedPeriod ? checkedPeriod.value : 'todo',
+            taskFilter: taskFilter ? taskFilter.getAttribute('data-task-filter') : 'none',
+            openOnly: openOnly ? openOnly.checked : false,
+            tagIds: tagIds
+        };
+    }
+
+    function applyFilters() {
+        console.log('[SAMA] applyFilters called');
+        var filters = getFilterValues();
+        console.log('[SAMA] Filters:', filters);
+
+        var now = new Date();
+        var cards = document.querySelectorAll('.lead-card');
+        var visibleCount = 0;
+
+        cards.forEach(function(card) {
+            var column = card.closest('.kanban-column');
+            var stage = card.getAttribute('data-stage') || (column ? column.getAttribute('data-stage') : '');
+            var stageMatch = filters.stages.length === 0 || filters.stages.indexOf(stage) !== -1;
+
+            var isClosed = card.getAttribute('data-is-closed') === 'true';
+            var closedMatch = !filters.openOnly || !isClosed;
+
+            var source = card.getAttribute('data-source') || '';
+            var sourceMatch = !filters.source || source === filters.source;
+
+            var cardTags = (card.getAttribute('data-tags') || '').split(',').filter(function(t) { return t; });
+            var tagsMatch = filters.tagIds.length === 0 || filters.tagIds.some(function(tid) { return cardTags.indexOf(tid) !== -1 || cardTags.indexOf(String(tid)) !== -1; });
+            console.log('[SAMA] cardTags:', cardTags, 'filters.tagIds:', filters.tagIds, 'tagsMatch:', tagsMatch);
+
+            var hasTask = card.getAttribute('data-has-task') === 'true';
+            var taskDate = card.getAttribute('data-task-due');
+            var taskMatch = true;
+            if (filters.taskFilter && filters.taskFilter !== 'none') {
+                var taskDueDate = taskDate ? new Date(taskDate) : null;
+                switch (filters.taskFilter) {
+                    case 'with_pending':
+                        taskMatch = hasTask;
+                        break;
+                    case 'due_today':
+                        taskMatch = taskDueDate && taskDueDate.toDateString() === now.toDateString();
+                        break;
+                    case 'due_tomorrow':
+                        var tomorrow = new Date(now);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        taskMatch = taskDueDate && taskDueDate.toDateString() === tomorrow.toDateString();
+                        break;
+                    case 'overdue':
+                        taskMatch = taskDueDate && taskDueDate < now;
+                        break;
+                    case 'none':
+                        taskMatch = !hasTask;
+                        break;
+                }
+            }
+
+            var createdStr = card.getAttribute('data-created');
+            var createdDate = createdStr ? new Date(createdStr) : null;
+            var periodMatch = true;
+            if (filters.period && filters.period !== 'todo' && createdDate) {
+                var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                switch (filters.period) {
+                    case 'hoy':
+                        periodMatch = createdDate >= startOfToday;
+                        break;
+                    case 'ayer':
+                        var yesterday = new Date(startOfToday);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        periodMatch = createdDate >= yesterday && createdDate < startOfToday;
+                        break;
+                    case '7d':
+                        var d7 = new Date(startOfToday);
+                        d7.setDate(d7.getDate() - 7);
+                        periodMatch = createdDate >= d7;
+                        break;
+                    case '30d':
+                        var d30 = new Date(startOfToday);
+                        d30.setDate(d30.getDate() - 30);
+                        periodMatch = createdDate >= d30;
+                        break;
+                    case 'mes':
+                        var startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                        periodMatch = createdDate >= startOfMonth;
+                        break;
+                }
+            }
+
+            var show = stageMatch && closedMatch && sourceMatch && tagsMatch && taskMatch && periodMatch;
+
+            card.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+
+        console.log('[SAMA] Visible cards:', visibleCount);
+        updateColumnCounts();
+    }
+
+    function clearFilters() {
+        document.querySelectorAll('.stage-filter').forEach(function(cb) { cb.checked = true; });
+        var source = document.getElementById('filter-source');
+        if (source) source.value = '';
+        var openOnly = document.getElementById('filter-open-only');
+        if (openOnly) openOnly.checked = false;
+        document.querySelectorAll('.task-filter-btn').forEach(function(btn) { btn.classList.remove('active'); });
+
+        document.querySelectorAll('.lead-card').forEach(function(card) {
+            card.style.display = '';
+        });
+        updateColumnCounts();
+    }
+
+    function loadTags() {
+        console.log('[SAMA] loadTags called');
+        var tenantSlug = document.body.getAttribute('data-tenant-slug');
+        if (!tenantSlug) return;
+
+        var url = '/api/crm/tenants/' + tenantSlug + '/tags/';
+        fetch(url)
+            .then(function(response) {
+                if (response.ok) return response.json();
+                throw new Error('API error');
+            })
+            .then(function(tags) {
+                console.log('[SAMA] Tags loaded:', tags);
+                renderTags(tags);
+            })
+            .catch(function(error) {
+                console.error('[SAMA] Error loading tags:', error);
+            });
+    }
+
+    function renderTags(tags) {
+        var container = document.getElementById('sidebar-tags-list');
+        if (!container) return;
+
+        if (!tags || tags.length === 0) {
+            container.innerHTML = '<div class="text-muted small">Sin etiquetas</div>';
+            return;
+        }
+
+        container.innerHTML = tags.map(function(tag) {
+            return '<div class="tag-check-item">' +
+                '<input class="form-check-input tag-filter" type="checkbox" ' +
+                'value="' + tag.id + '" id="tag-' + tag.id + '" checked>' +
+                '<span class="tag-color-dot" style="background:' + (tag.color || '#3498db') + ';"></span>' +
+                '<label for="tag-' + tag.id + '">' + tag.name + '</label>' +
+                '<span class="badge bg-secondary ms-1 tag-count" id="tag-count-' + tag.id + '"></span>' +
+                '</div>';
+        }).join('');
+
+        container.querySelectorAll('.tag-filter').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                updateFilterCounts();
+            });
+        });
+    }
+
+    function updateFilterCounts() {
+        var cards = document.querySelectorAll('.lead-card');
+        var cardsData = [];
+        cards.forEach(function(card) {
+            cardsData.push(card);
+        });
+
+        var tagCounts = {};
+        var taskCounts = {
+            with_pending: 0,
+            due_today: 0,
+            due_tomorrow: 0,
+            overdue: 0,
+            none: 0
+        };
+        var now = new Date();
+
+        cardsData.forEach(function(card) {
+            var tags = (card.getAttribute('data-tags') || '').split(',').filter(function(t) { return t; });
+            tags.forEach(function(tagId) {
+                tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+            });
+
+            var hasTask = card.getAttribute('data-has-task') === 'true';
+            var taskDate = card.getAttribute('data-task-due');
+            var taskDueDate = taskDate ? new Date(taskDate) : null;
+
+            if (hasTask) taskCounts.with_pending++;
+            if (taskDueDate) {
+                if (taskDueDate.toDateString() === now.toDateString()) taskCounts.due_today++;
+                var tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                if (taskDueDate.toDateString() === tomorrow.toDateString()) taskCounts.due_tomorrow++;
+                if (taskDueDate < now) taskCounts.overdue++;
+            }
+            if (!hasTask) taskCounts.none++;
+        });
+
+        document.querySelectorAll('.tag-count').forEach(function(badge) {
+            var tagId = badge.id.replace('tag-count-', '');
+            var count = tagCounts[tagId] || 0;
+            badge.textContent = count > 0 ? count : '';
+        });
+
+        var taskBtnWithPending = document.querySelector('[data-task-filter="with_pending"]');
+        var taskBtnDueToday = document.querySelector('[data-task-filter="due_today"]');
+        var taskBtnDueTomorrow = document.querySelector('[data-task-filter="due_tomorrow"]');
+        var taskBtnOverdue = document.querySelector('[data-task-filter="overdue"]');
+        var taskBtnNone = document.querySelector('[data-task-filter="none"]');
+
+        if (taskBtnWithPending) taskBtnWithPending.innerHTML = 'Con tareas pendientes <span class="badge bg-secondary ms-1">' + taskCounts.with_pending + '</span>';
+        if (taskBtnDueToday) taskBtnDueToday.innerHTML = 'Vencen hoy <span class="badge bg-secondary ms-1">' + taskCounts.due_today + '</span>';
+        if (taskBtnDueTomorrow) taskBtnDueTomorrow.innerHTML = 'Mañana <span class="badge bg-secondary ms-1">' + taskCounts.due_tomorrow + '</span>';
+        if (taskBtnOverdue) taskBtnOverdue.innerHTML = 'Vencidas <span class="badge bg-secondary ms-1">' + taskCounts.overdue + '</span>';
+        if (taskBtnNone) taskBtnNone.innerHTML = 'Sin tareas <span class="badge bg-secondary ms-1">' + taskCounts.none + '</span>';
+    }
+
+    // ─── INIT ───
+    function init() {
+        console.log('[SAMA] dashboard.js init called');
+        // Solo inicializar si estamos en el dashboard (existe lead-search)
+        if (!document.getElementById('lead-search')) {
+            console.log('[SAMA] lead-search not found, skipping init');
+            return;
+        }
+
+        DOM.searchInput = document.getElementById('lead-search');
+        DOM.searchClear = document.getElementById('search-clear');
+        DOM.leadCards = document.querySelectorAll('.lead-card');
+        DOM.kanbanColumns = document.querySelectorAll('.kanban-column');
+
+        initSearch();
+        initDragDrop();
+        initNoteModal();
+        initReopenModal();
+        initErrorRestoreModal();
+        initRecompraModal();
+        initSidebar();
+        updateFilterCounts();
         updateColumnCounts();
     }
 
@@ -143,6 +492,7 @@
     }
 
     function onDragStart(e) {
+        console.log('[SAMA] onDragStart');
         draggedCard = this;
         sourceColumn = this.closest('.kanban-column');
         this.classList.add(CONFIG.DRAG_FEEDBACK_CLASS);
@@ -171,6 +521,7 @@
     }
 
     function onDrop(e) {
+        console.log('[SAMA] onDrop');
         if (e.stopPropagation) e.stopPropagation();
         this.classList.remove(CONFIG.DRAG_OVER_CLASS);
 
@@ -245,25 +596,19 @@
             hideModal('noteModal');
 
             if (!note) {
-                // Sin nota
                 if (isLeadClosed && isMovingToActive) {
-                    // Lead cerrado movido a etapa activa: mostrar modal
                     document.getElementById('drag-note-text').value = '';
                     showModal('reopenModal');
                 } else {
-                    // Movimiento normal sin nota
                     doStageChange(pendingDrag.leadId, pendingDrag.newStage, pendingDrag.targetCol, pendingDrag.card, pendingDrag.sourceCol, note, tenantSlug);
                     pendingDrag = null;
                 }
             } else {
-                // Con nota
                 if (isLeadClosed && isMovingToActive) {
-                    // Con nota + lead cerrado → activo: guardar nota y mostrar reopen
                     document.getElementById('drag-note-text').value = '';
                     pendingDrag.note = note;
                     showModal('reopenModal');
                 } else {
-                    // Con nota + movimiento normal
                     doStageChange(pendingDrag.leadId, pendingDrag.newStage, pendingDrag.targetCol, pendingDrag.card, pendingDrag.sourceCol, note, tenantSlug);
                     pendingDrag = null;
                 }
@@ -271,11 +616,16 @@
         });
 
         modalEl.addEventListener('hidden.bs.modal', function() {
-            if (pendingDrag) {
-                revertCard(pendingDrag.card, pendingDrag.sourceCol);
-                pendingDrag = null;
-            }
-            document.getElementById('drag-note-text').value = '';
+            setTimeout(function() {
+                if (!document.getElementById('reopenModal').classList.contains('show') &&
+                    !document.getElementById('errorRestoreModal').classList.contains('show') &&
+                    !document.getElementById('recompraModal').classList.contains('show')) {
+                    if (pendingDrag && !pendingDrag._transitioning && !recompraInProgress) {
+                        revertCard(pendingDrag.card, pendingDrag.sourceCol);
+                        pendingDrag = null;
+                    }
+                }
+            }, 100);
         });
     }
 
@@ -338,20 +688,30 @@
         if (!errorBtn || !newBtn || !modalEl) return;
 
         errorBtn.addEventListener('click', function() {
-            populateErrorRestoreModal();
-            setTimeout(function() { showModal('errorRestoreModal'); }, 350);
+            if (pendingDrag) pendingDrag._transitioning = true;
+            if (pendingDrag) {
+                revertCard(pendingDrag.card, pendingDrag.sourceCol);
+                pendingDrag._transitioning = false;
+                pendingDrag = null;
+            }
+            hideModal('reopenModal');
         });
 
         newBtn.addEventListener('click', function() {
+            if (pendingDrag) pendingDrag._transitioning = true;
             var product = document.querySelector('#recompraModal input#recompra-product');
             if (product) product.value = pendingDrag && pendingDrag.card ? pendingDrag.card.getAttribute('data-product') || '' : '';
+            hideModal('reopenModal');
             setTimeout(function() { showModal('recompraModal'); }, 350);
         });
 
         modalEl.addEventListener('hidden.bs.modal', function() {
-            if (pendingDrag && !recompraInProgress) {
+            if (pendingDrag && !pendingDrag._transitioning && !recompraInProgress) {
                 revertCard(pendingDrag.card, pendingDrag.sourceCol);
                 pendingDrag = null;
+            }
+            if (pendingDrag && pendingDrag._transitioning) {
+                pendingDrag._transitioning = false;
             }
         });
     }
@@ -392,25 +752,26 @@
             hideModal('errorRestoreModal');
             hideModal('reopenModal');
 
-            // Encontrar la columna destino por nombre de etapa
             var targetCol = null;
             document.querySelectorAll('.kanban-column').forEach(function(col) {
                 if (col.getAttribute('data-stage') === targetStage) targetCol = col;
             });
 
             if (targetCol) {
-                // El movimiento visual ya se hizo en drop; revert y re-move a la etapa correcta
                 revertCard(pendingDrag.card, pendingDrag.targetCol);
                 doStageChange(pendingDrag.leadId, targetStage, targetCol, pendingDrag.card, pendingDrag.sourceCol, pendingDrag.note || '', tenantSlug);
             } else {
                 revertCard(pendingDrag.card, pendingDrag.sourceCol);
             }
 
+            if (pendingDrag) pendingDrag._transitioning = false;
             pendingDrag = null;
         });
 
         modalEl.addEventListener('hidden.bs.modal', function() {
-            // No revertir aquí: el flujo es regresar a reopenModal
+            if (pendingDrag && pendingDrag._transitioning) {
+                pendingDrag._transitioning = false;
+            }
         });
     }
 
@@ -436,12 +797,10 @@
 
             hideModal('recompraModal');
 
-            // Primero: si hay nota, guardarla en el lead original
             if (pendingDrag.note) {
                 doAddNote(leadId, pendingDrag.note, tenantSlug);
             }
 
-            // POST /api/crm/leads/{id}/reopen/
             var url = CONFIG.API_BASE + leadId + '/reopen/?tenant_slug=' + encodeURIComponent(tenantSlug);
 
             fetch(url, {
@@ -459,7 +818,6 @@
             .then(function(data) {
                 pendingDrag = null;
                 recompraInProgress = false;
-                // Refresh stats and reload to show new lead
                 setTimeout(refreshStats, 300);
                 location.reload();
             })
@@ -467,12 +825,15 @@
                 console.error('Error en recompra:', error);
                 pendingDrag = null;
                 recompraInProgress = false;
-                // Revert the card if there was an error
                 if (originalCard) {
                     revertCard(originalCard, pendingDrag ? pendingDrag.sourceCol : null);
                 }
                 location.reload();
             });
+        });
+
+        modalEl.addEventListener('hidden.bs.modal', function() {
+            if (pendingDrag) pendingDrag._transitioning = false;
         });
     }
 
@@ -486,25 +847,6 @@
             var badge = col.querySelector('.kanban-stage-count');
             if (badge) badge.textContent = visible;
         });
-    }
-
-    // ─── INIT ───
-    function init() {
-        // Solo inicializar si estamos en el dashboard (existe lead-search)
-        if (!document.getElementById('lead-search')) return;
-
-        DOM.searchInput = document.getElementById('lead-search');
-        DOM.searchClear = document.getElementById('search-clear');
-        DOM.leadCards = document.querySelectorAll('.lead-card');
-        DOM.kanbanColumns = document.querySelectorAll('.kanban-column');
-
-        initSearch();
-        initDragDrop();
-        initNoteModal();
-        initReopenModal();
-        initErrorRestoreModal();
-        initRecompraModal();
-        updateColumnCounts();
     }
 
     if (document.readyState === 'loading') {

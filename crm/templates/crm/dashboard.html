@@ -85,10 +85,13 @@
                data-lead-id="{{ lead.id }}"
                data-stage-color="{{ stage.color|default:'#64748b' }}"
                data-is-closed="{% if lead.is_closed %}true{% endif %}"
+               data-stage="{{ stage.name }}"
                data-product="{{ lead.product_of_interest|default:'' }}"
                data-name="{{ lead.contact.full_name|lower }}"
                data-phone="{{ lead.contact.phone_number }}"
-               data-product="{{ lead.product_of_interest|lower }}"
+               data-created="{{ lead.created_at|date:'c' }}"
+               data-source="{{ lead.source.platform|default:'' }}"
+               data-tags="{% for tag in lead.tags_list %}{{ tag.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
                style="--stage-color: {{ stage.color|default:'var(--color-text-muted)' }};"
                aria-label="Lead {{ lead.contact.full_name }}, {{ lead.product_of_interest }}">
                 <div class="lead-card-header">
@@ -98,6 +101,15 @@
                 <div class="lead-card-product">
                     <i class="bi bi-box-seam me-1"></i>{{ lead.product_of_interest|default:"Sin producto" }}
                 </div>
+                {% if lead.tags_list %}
+                <div class="lead-card-tags">
+                    {% for tag in lead.tags_list %}
+                    <span class="lead-tag-badge" style="background:{{ tag.color|default:'#3498db' }}20; color:{{ tag.color|default:'#3498db' }}; border:1px solid {{ tag.color|default:'#3498db' }}40;">
+                        {{ tag.name }}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <div class="lead-card-footer">
                     <span class="lead-card-time">
                         <i class="bi bi-clock"></i>

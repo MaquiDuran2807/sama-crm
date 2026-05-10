@@ -17,14 +17,15 @@
 
 {% block content %}
 <div class="analytics-page" id="main-content">
+    <!-- Filter bar -->
     <div class="filter-bar">
         <div class="filter-left">
             <div class="date-navigator">
-                <button class="nav-btn" id="prev-period-btn" title="Mes anterior">
+                <button class="nav-btn" id="prev-period-btn" title="Período anterior">
                     <i class="bi bi-chevron-left"></i>
                 </button>
-                <div class="current-period" id="current-period-label">Mayo 2026</div>
-                <button class="nav-btn" id="next-period-btn" title="Mes siguiente">
+                <div class="current-period" id="current-period-label">Último mes</div>
+                <button class="nav-btn" id="next-period-btn" title="Período siguiente">
                     <i class="bi bi-chevron-right"></i>
                 </button>
             </div>
@@ -38,7 +39,7 @@
                 <button class="range-btn" data-days="0" id="btn-all">Todo</button>
             </div>
             <select id="source-filter" class="source-select">
-                <option value="">Todos</option>
+                <option value="">Todas las fuentes</option>
                 <option value="meta">Meta</option>
                 <option value="google">Google</option>
                 <option value="tiktok">TikTok</option>
@@ -48,6 +49,7 @@
         </div>
     </div>
 
+    <!-- Stats cards -->
     <div class="summary-cards">
         <div class="summary-card total">
             <div class="summary-value" id="stat-total">—</div>
@@ -65,25 +67,66 @@
             <div class="summary-value" id="stat-week">—</div>
             <div class="summary-label">Leads esta semana</div>
         </div>
+        <div class="summary-card won">
+            <div class="summary-value" id="stat-won">—</div>
+            <div class="summary-label">Cerrados Ganados</div>
+        </div>
+        <div class="summary-card lost">
+            <div class="summary-value" id="stat-lost">—</div>
+            <div class="summary-label">Cerrados Perdidos</div>
+        </div>
     </div>
 
-    <div class="charts-row">
+    <!-- Row 1: Colombia Map + Regional Table -->
+    <div class="charts-grid-2 mb-4">
         <div class="chart-card">
-            <div class="chart-title">Embudo por etapa</div>
+            <div class="chart-title">Leads por región</div>
+            <div class="map-container" id="colombia-map-container">
+                <svg id="colombia-map" viewBox="0 0 500 600" xmlns="http://www.w3.org/2000/svg" class="col-map-svg"></svg>
+                <div id="map-tooltip" class="map-tooltip"></div>
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Datos por departamento</div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 region-table" id="region-table">
+                    <thead>
+                        <tr>
+                            <th>Departamento</th>
+                            <th class="text-center">Leads</th>
+                            <th class="text-center">Ganados</th>
+                            <th class="text-center">Tasa</th>
+                            <th style="width: 80px;">Conversión</th>
+                        </tr>
+                    </thead>
+                    <tbody id="region-table-body">
+                        <tr><td colspan="5" class="text-center text-muted py-4">Sin datos disponibles</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Funnel + Source Mix -->
+    <div class="charts-grid-2 mb-4">
+        <div class="chart-card">
+            <div class="chart-title">Embudo de ventas</div>
             <div class="chart-wrapper">
                 <canvas id="funnel-chart"></canvas>
             </div>
+            <div class="funnel-summary" id="funnel-summary"></div>
         </div>
         <div class="chart-card">
-            <div class="chart-title">Leads por fuente</div>
+            <div class="chart-title">Mix de fuentes mensual</div>
             <div class="chart-wrapper">
-                <canvas id="source-chart"></canvas>
+                <canvas id="source-mix-chart"></canvas>
             </div>
         </div>
     </div>
 
+    <!-- Row 3: Timeline (full width) -->
     <div class="chart-full">
-        <div class="chart-title">Leads por día</div>
+        <div class="chart-title">Leads en el tiempo</div>
         <div class="chart-wrapper">
             <canvas id="timeline-chart"></canvas>
         </div>
@@ -93,6 +136,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script src="{% static 'crm/js/analytics.js' %}"></script>
 {% endblock %}

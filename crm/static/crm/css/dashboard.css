@@ -324,6 +324,21 @@
     color: var(--color-text-tertiary);
 }
 
+.lead-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.35rem;
+}
+
+.lead-tag-badge {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 50px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
 .lead-card-time {
     display: flex;
     align-items: center;

@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from crm.models import Contact, Lead, LeadActivity, LeadSource, DailyFollowupReport
+from crm.models import City, Contact, Lead, LeadActivity, LeadSource, LeadTask, LeadTag, Tag, DailyFollowupReport, Department
 from tenants.models import CustomField, PipelineConfig, Tenant, TenantModule
 
 
@@ -117,6 +117,12 @@ class Command(BaseCommand):
 
         self._crear_reportes_seguimiento(tenant, leads)
 
+        tags = self._crear_tags(tenant)
+
+        self._asignar_tags_a_leads(leads, tags)
+
+        self._crear_tareas(leads)
+
         return self._obtener_counts(tenant)
 
     def _crear_tenant(self) -> Tenant:
@@ -205,6 +211,14 @@ class Command(BaseCommand):
     def _crear_contactos(self, tenant: Tenant) -> list[Contact]:
         """Genera 50 contactos con nombres realistas."""
         contacts = []
+        cities = list(City.objects.all())
+
+        if not cities:
+            dept, _ = Department.objects.get_or_create(name="Cundinamarca")
+            cities_data = ["Bogota", "Cali", "Medellin", "Barranquilla", "Cartagena", "Bucaramanga"]
+            for city_name in cities_data:
+                city, _ = City.objects.get_or_create(department=dept, name=city_name)
+                cities.append(city)
 
         generos = ["F"] * 25 + ["M"] * 25
 
@@ -219,7 +233,7 @@ class Command(BaseCommand):
             nombre_completo = f"{nombre} {apellido}"
             email = f"{nombre.lower()}.{apellido.lower()}{i}@example.com"
             telefono = f"+57 300 {random.randint(100, 999)} {random.randint(1000, 9999)}"
-            ciudad = random.choice(self.CIUDADES)
+            city = random.choice(cities)
 
             contact, created = Contact.objects.get_or_create(
                 tenant=tenant,
@@ -227,7 +241,7 @@ class Command(BaseCommand):
                 defaults={
                     "full_name": nombre_completo,
                     "email": email,
-                    "city": ciudad,
+                    "city": city,
                     "utm_source": random.choice(self.UTM_SOURCES),
                     "utm_medium": random.choice(self.UTM_MEDIUMS),
                     "utm_campaign": random.choice(self.UTM_CAMPANAS),
@@ -356,6 +370,88 @@ class Command(BaseCommand):
 
         return len(reportes)
 
+    def _crear_tags(self, tenant: Tenant) -> list[Tag]:
+        """Crea etiquetas predefinidas para el tenant."""
+        tags_data = [
+            {"name": "Prioridad Alta", "color": "#ef4444", "is_predefined": True},
+            {"name": "Seguimiento", "color": "#f5a623", "is_predefined": True},
+            {"name": "Nuevo Lead", "color": "#3b82f6", "is_predefined": True},
+            {"name": "Caliente", "color": "#f06539", "is_predefined": True},
+            {"name": "Frio", "color": "#64748b", "is_predefined": True},
+            {"name": "VIP", "color": "#8b5cf6", "is_predefined": True},
+            {"name": "Cotizacion Enviada", "color": "#2ec27e", "is_predefined": True},
+            {"name": "Revisar", "color": "#ec4899", "is_predefined": True},
+        ]
+
+        tags = []
+        for tag_data in tags_data:
+            tag, created = Tag.objects.get_or_create(
+                tenant=tenant,
+                name=tag_data["name"],
+                defaults={
+                    "color": tag_data["color"],
+                    "is_predefined": tag_data["is_predefined"],
+                },
+            )
+            tags.append(tag)
+
+        return tags
+
+    def _asignar_tags_a_leads(self, leads: list[Lead], tags: list[Tag]) -> int:
+        """Asigna etiquetas aleatorias a algunos leads."""
+        assignments = 0
+        for lead in leads:
+            num_tags = random.randint(0, 3)
+            if num_tags > 0:
+                selected_tags = random.sample(tags, min(num_tags, len(tags)))
+                for tag in selected_tags:
+                    LeadTag.objects.get_or_create(
+                        lead=lead,
+                        tag=tag,
+                    )
+                    assignments += 1
+        return assignments
+
+    def _crear_tareas(self, leads: list[Lead]) -> int:
+        """Crea tareas para algunos leads."""
+        task_descriptions = [
+            "Llamar al cliente para confirmar cita",
+            "Enviar cotizacion por WhatsApp",
+            "Realizar visita tecnica",
+            "Confirmar disponibilidad de instalacion",
+            "Revisar aprobacion de credito",
+            "Seguimiento post-instalacion",
+            "Enviar contrato firmado",
+            "Confirmar fecha de entrega",
+            "Actualizar informacion del lead",
+            "Revisar requisitos para instalacion",
+        ]
+
+        tareas_creadas = 0
+        leads_con_tareas = random.sample(leads, min(25, len(leads)))
+
+        for lead in leads_con_tareas:
+            num_tareas = random.randint(1, 3)
+            for i in range(num_tareas):
+                description = random.choice(task_descriptions)
+                days_offset = random.randint(-5, 15)
+                due_date = timezone.now() + timedelta(days=days_offset)
+
+                is_completed = random.random() > 0.6
+
+                LeadTask.objects.get_or_create(
+                    lead=lead,
+                    description=description,
+                    defaults={
+                        "due_date": due_date,
+                        "is_completed": is_completed,
+                        "completed_at": timezone.now() - timedelta(days=random.randint(1, 5)) if is_completed else None,
+                    },
+                )
+                tareas_creadas += 1
+
+        return tareas_creadas
+
     def _obtener_counts(self, tenant: Tenant) -> dict[str, Any]:
         """Obtiene el conteo final de todos los elementos creados."""
         leads_qs = Lead.objects.filter(tenant=tenant)
@@ -370,6 +466,9 @@ class Command(BaseCommand):
             "lead_sources": LeadSource.objects.filter(lead__tenant=tenant).count(),
             "lead_activities": LeadActivity.objects.filter(lead__tenant=tenant).count(),
             "reports": DailyFollowupReport.objects.filter(tenant=tenant).count(),
+            "tags": Tag.objects.filter(tenant=tenant).count(),
+            "lead_tags": LeadTag.objects.filter(lead__tenant=tenant).count(),
+            "tasks": LeadTask.objects.filter(lead__tenant=tenant).count(),
             "stages_count": stages_count,
         }
 
@@ -381,6 +480,9 @@ class Command(BaseCommand):
         self.stdout.write(f"{result['lead_sources']} LeadSource creados")
         self.stdout.write(f"{result['lead_activities']} actividades creadas")
         self.stdout.write(f"{result['reports']} reportes de seguimiento creados")
+        self.stdout.write(f"{result['tags']} etiquetas creadas")
+        self.stdout.write(f"{result['lead_tags']} etiquetas asignadas a leads")
+        self.stdout.write(f"{result['tasks']} tareas creadas")
 
         stages_str = ", ".join([f"{k}: {v}" for k, v in result["stages_count"].items()])
         self.stdout.write(self.style.SUCCESS(f"Leads por etapa: {stages_str}"))

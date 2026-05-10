@@ -43,6 +43,19 @@
         {% else %}
         <p class="mb-0 muted" style="font-size: .85rem;">Sin información de origen</p>
         {% endif %}
+
+        {% if lead.tags_list %}
+        <hr style="border-color: var(--color-card-border); margin: 1rem 0;">
+        <p class="mb-2"><strong>Etiquetas:</strong></p>
+        <div class="d-flex flex-wrap gap-2">
+            {% for tag in lead.tags_list %}
+            <span class="lead-tag-detail" style="background:{{ tag.color|default:'#3498db' }}20; color:{{ tag.color|default:'#3498db' }}; border:1px solid {{ tag.color|default:'#3498db' }}50;">
+                <span class="tag-dot" style="background:{{ tag.color|default:'#3498db' }};"></span>
+                {{ tag.name }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
     </section>
 
     <!-- Panel de Cambio de Etapa y Notas -->

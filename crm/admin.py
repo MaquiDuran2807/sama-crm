@@ -7,7 +7,7 @@ el admin de Django sin salir del proyecto.
 
 from django.contrib import admin
 
-from crm.models import Contact, Lead, LeadActivity, LeadSource
+from crm.models import Contact, Lead, LeadActivity, LeadSource, LeadTask, Department, City, Tag
 
 
 class LeadActivityReadOnlyInline(admin.TabularInline):
@@ -34,7 +34,7 @@ class ContactAdmin(admin.ModelAdmin):
     """Vista administrativa principal para los contactos CRM."""
 
     list_display = ("full_name", "tenant", "phone_number", "email", "city", "created_at")
-    list_filter = ("tenant", "city")
+    list_filter = ("tenant", "city", "city__department")
     search_fields = ("phone_number", "email")
 
 
@@ -65,3 +65,30 @@ class LeadActivityAdmin(admin.ModelAdmin):
     list_filter = ("activity_type", "performed_by")
     search_fields = ("lead__contact__full_name", "description")
     readonly_fields = ("created_at",)
+
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+@admin.register(City)
+class CityAdmin(admin.ModelAdmin):
+    list_display = ("name", "department", "latitude", "longitude")
+    list_filter = ("department",)
+    search_fields = ("name", "department__name")
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "tenant", "color")
+    list_filter = ("tenant",)
+    search_fields = ("name", "tenant__name")
+
+
+@admin.register(LeadTask)
+class LeadTaskAdmin(admin.ModelAdmin):
+    list_display = ("description", "lead", "due_date", "is_completed", "created_at")
+    list_filter = ("is_completed",)
+    search_fields = ("description", "lead__contact__full_name")

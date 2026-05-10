@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any
 
 from django.db.models import Avg, Count, Q
+from django.db.models.functions import TruncMonth
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -24,7 +25,7 @@ from django.utils import timezone
 
 from tenants.domain.models import Tenant
 from tenants.domain.services import get_pipeline_stages
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, Tag, LeadTag, LeadTask
 from crm.domain.services import change_lead_stage, get_leads_stats, get_lead_summary
 from crm.domain.contact_sync import sync_contact_from_whatsapp
 from crm.interfaces.serializers import (
@@ -34,6 +35,9 @@ from crm.interfaces.serializers import (
     LeadCreateSerializer,
     LeadSummarySerializer,
     LeadsStatsSerializer,
+    TagSerializer,
+    LeadTagSerializer,
+    TaskSerializer,
 )
 
 
@@ -124,6 +128,24 @@ class LeadViewSet(viewsets.ModelViewSet):
         contact_id = self.request.query_params.get("contact_id")
         if contact_id:
             qs = qs.filter(contact_id=contact_id)
+
+        has_tasks = self.request.query_params.get("has_tasks")
+        if has_tasks == "true":
+            qs = qs.filter(tasks__isnull=False).distinct()
+        elif has_tasks == "false":
+            qs = qs.filter(tasks__isnull=True)
+
+        task_due_before = self.request.query_params.get("task_due_before")
+        if task_due_before:
+            qs = qs.filter(tasks__due_date__lte=task_due_before, tasks__is_completed=False).distinct()
+
+        task_due_after = self.request.query_params.get("task_due_after")
+        if task_due_after:
+            qs = qs.filter(tasks__due_date__gte=task_due_after, tasks__is_completed=False).distinct()
+
+        tag_id = self.request.query_params.get("tag")
+        if tag_id:
+            qs = qs.filter(lead_tags__tag_id=tag_id).distinct()
 
         return qs.select_related("contact", "tenant")
 
@@ -332,6 +354,74 @@ class LeadViewSet(viewsets.ModelViewSet):
         serializer = LeadDetailSerializer(new_lead)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["get", "post"], url_path="tasks")
+    def tasks(self, request, pk=None):
+        """Lista o crea tareas para el lead.
+
+        GET /api/crm/leads/{id}/tasks/
+        POST /api/crm/leads/{id}/tasks/ — body: {description, due_date}
+        """
+        lead = self.get_object()
+        if request.method == "GET":
+            tasks_qs = lead.tasks.all().order_by("-created_at")
+            serializer = TaskSerializer(tasks_qs, many=True)
+            return Response(serializer.data)
+        serializer = TaskSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(lead=lead)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["patch", "delete"], url_path="tasks/(?P<task_id>[0-9]+)")
+    def task_detail(self, request, pk=None, task_id=None):
+        """Actualiza o elimina una tarea del lead.
+
+        PATCH /api/crm/leads/{id}/tasks/{task_id}/ — body: {description, due_date, is_completed}
+        DELETE /api/crm/leads/{id}/tasks/{task_id}/
+        """
+        lead = self.get_object()
+        task = get_object_or_404(lead.tasks, pk=task_id)
+        if request.method == "PATCH":
+            serializer = TaskSerializer(task, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        task.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="add_tag")
+    def add_tag(self, request, pk=None):
+        """Añade una etiqueta al lead.
+
+        POST /api/crm/leads/{id}/add_tag/
+        Body: {tag_id: int}
+        """
+        lead = self.get_object()
+        tag_id = request.data.get("tag_id")
+        if not tag_id:
+            return Response({"detail": "tag_id es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        tag = get_object_or_404(Tag, pk=tag_id, tenant=lead.tenant)
+        lead_tag, created = LeadTag.objects.get_or_create(lead=lead, tag=tag)
+        serializer = LeadTagSerializer(lead_tag)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="remove_tag")
+    def remove_tag(self, request, pk=None):
+        """Quita una etiqueta del lead.
+
+        POST /api/crm/leads/{id}/remove_tag/
+        Body: {tag_id: int}
+        """
+        lead = self.get_object()
+        tag_id = request.data.get("tag_id")
+        if not tag_id:
+            return Response({"detail": "tag_id es obligatorio."}, status=status.HTTP_400_BAD_REQUEST)
+        deleted, _ = lead.lead_tags.filter(tag_id=tag_id).delete()
+        if deleted:
+            return Response({"detail": "Etiqueta eliminada."})
+        return Response({"detail": "Etiqueta no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
 
 def _format_time_since(updated_at):
     """Formatea el tiempo transcurrido desde la ultima actualizacion.
@@ -397,6 +487,7 @@ class CrmDashboardTemplateView(LoginRequiredMixin, View):
         leads = (
             Lead.objects.filter(tenant=tenant, is_deleted=False)
             .select_related("contact")
+            .prefetch_related("lead_tags__tag")
             .order_by("current_stage", "-updated_at")
         )
 
@@ -404,6 +495,11 @@ class CrmDashboardTemplateView(LoginRequiredMixin, View):
         for lead in leads:
             lead.time_since_update = _format_time_since(lead.updated_at)
             lead.is_new = lead.created_at.date() == timezone.localdate()
+            lead.tags_list = [
+                {"id": lt.tag.id, "name": lt.tag.name, "color": lt.tag.color}
+                for lt in lead.lead_tags.all()
+            ]
+            lead.tags_ids = [str(lt.tag.id) for lt in lead.lead_tags.all()]
             leads_by_stage[lead.current_stage].append(lead)
 
         pipeline = []
@@ -447,10 +543,14 @@ class CrmLeadDetailTemplateView(LoginRequiredMixin, View):
 
         tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
         lead = get_object_or_404(
-            Lead.objects.select_related("contact", "tenant", "source").prefetch_related("activities"),
+            Lead.objects.select_related("contact", "tenant", "source").prefetch_related("activities", "lead_tags__tag"),
             pk=lead_id,
             tenant=tenant,
         )
+        lead.tags_list = [
+            {"id": lt.tag.id, "name": lt.tag.name, "color": lt.tag.color}
+            for lt in lead.lead_tags.all()
+        ]
         summary = get_lead_summary(lead)
         pipeline_stages = get_pipeline_stages(tenant)
         activities = lead.activities.all()
@@ -794,6 +894,53 @@ def analytics_api(request, tenant_slug: str):
         for row in quotes_date_counts
     ]
 
+    # ── Leads by region (city as department) ──
+    region_counts = (
+        leads_qs.filter(contact__isnull=False, contact__city__isnull=False)
+        .values("contact__city__department__name")
+        .annotate(total=Count("id"))
+    )
+    region_won_counts = dict(
+        leads_qs.filter(is_closed=True, closed_result="won", contact__isnull=False, contact__city__isnull=False)
+        .values("contact__city__department__name")
+        .annotate(won=Count("id"))
+        .values_list("contact__city__department__name", "won")
+    )
+    leads_by_region = []
+    for row in region_counts:
+        department = row["contact__city__department__name"] or "Sin especificar"
+        won = region_won_counts.get(department, 0)
+        total = row["total"]
+        leads_by_region.append({
+            "department": department,
+            "total": total,
+            "won": won,
+            "conversion_rate": round((won / total) * 100, 1) if total > 0 else 0,
+        })
+    leads_by_region.sort(key=lambda x: x["total"], reverse=True)
+
+    # ── Leads by source monthly ──
+    monthly_platforms = ["meta", "google", "tiktok", "web", "referral"]
+    monthly_data = defaultdict(lambda: {p: 0 for p in monthly_platforms})
+
+    source_monthly_counts = (
+        leads_qs.filter(source__isnull=False, source__platform__isnull=False)
+        .annotate(month=TruncMonth("created_at"))
+        .values("month", "source__platform")
+        .annotate(count=Count("id"))
+        .order_by("month")
+    )
+    for row in source_monthly_counts:
+        month_key = row["month"].strftime("%Y-%m")
+        platform = row["source__platform"] or "unknown"
+        if platform in monthly_data[month_key]:
+            monthly_data[month_key][platform] = row["count"]
+
+    leads_by_source_monthly = [
+        {"month": month, **monthly_data[month]}
+        for month in sorted(monthly_data.keys())
+    ]
+
     return Response({
         "funnel": funnel,
         "leads_by_source": leads_by_source,
@@ -801,6 +948,8 @@ def analytics_api(request, tenant_slug: str):
         "leads_by_stage_won": leads_by_stage_won,
         "leads_by_stage_lost": leads_by_stage_lost,
         "quotes_sent": quotes_sent,
+        "leads_by_region": leads_by_region,
+        "leads_by_source_monthly": leads_by_source_monthly,
         "summary": {
             "total_leads": total_leads,
             "won_leads": won_leads,
@@ -811,3 +960,45 @@ def analytics_api(request, tenant_slug: str):
             "leads_this_week": leads_this_week,
         },
     })
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def tags_list_create(request, tenant_slug):
+    """Lista y crea etiquetas para un tenant.
+
+    GET /api/crm/tenants/{slug}/tags/ — lista todas las etiquetas (predefinidas + custom)
+    POST /api/crm/tenants/{slug}/tags/ — crea una etiqueta custom
+    Body POST: {name: str, color: str (optional)}
+    """
+    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+
+    if request.method == "GET":
+        tags = Tag.objects.filter(tenant=tenant).order_by("name")
+        serializer = TagSerializer(tags, many=True)
+        return Response(serializer.data)
+
+    serializer = TagSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(tenant=tenant, is_predefined=False)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def tag_delete(request, tenant_slug, tag_id):
+    """Elimina una etiqueta no predefinida.
+
+    DELETE /api/crm/tenants/{slug}/tags/{id}/
+    Solo elimina si is_predefined=False.
+    """
+    tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+    tag = get_object_or_404(Tag, pk=tag_id, tenant=tenant)
+    if tag.is_predefined:
+        return Response(
+            {"detail": "No se pueden eliminar etiquetas predefinidas."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+    tag.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

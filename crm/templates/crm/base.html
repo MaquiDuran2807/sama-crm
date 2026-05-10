@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="{% static 'crm/css/themes.css' %}" rel="stylesheet">
     <link href="{% static 'crm/css/base_layout.css' %}" rel="stylesheet">
+    <link href="{% static 'crm/css/sidebar.css' %}" rel="stylesheet">
 
     <!-- CSS específicos de la página (dashboard, analytics, etc.) -->
     {% block extra_css %}{% endblock %}
@@ -63,8 +64,6 @@
                             </div>
                         </li>
                         <li><a class="dropdown-item" href="/crm/{{ tenant.slug }}/config/">Configuración</a></li>
-                        <li><a class="dropdown-item" href="/crm/{{ tenant.slug }}/trash/">Papelera</a></li>
-                        <li><a class="dropdown-item" href="/crm/{{ tenant.slug }}/analytics/">Analíticas</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item disabled" href="#" aria-disabled="true" tabindex="-1">Cerrar sesión</a></li>
                     </ul>
@@ -73,6 +72,12 @@
             </div>
         </div>
     </header>
+
+    <!-- ========== NAVBAR ========== -->
+    {% include "crm/navbar.html" %}
+
+    <!-- ========== SIDEBAR (filter panel) ========== -->
+    {% include "crm/sidebar.html" %}
 
     <!-- ========== MAIN CONTENT ========== -->
     <main id="main-content" class="main-container" role="main">

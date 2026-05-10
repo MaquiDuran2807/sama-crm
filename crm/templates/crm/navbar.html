@@ -1,0 +1,30 @@
+<nav class="sama-navbar" aria-label="Navegación principal del CRM">
+    <div class="sama-navbar-inner">
+        <ul class="nav nav-pills sama-nav-links" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link {% if current_page == 'dashboard' %}active{% endif %}"
+                   href="/crm/{{ tenant.slug }}/dashboard/"
+                   {% if current_page == 'dashboard' %}aria-current="page"{% endif %}>
+                    <i class="bi bi-kanban me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if current_page == 'analytics' %}active{% endif %}"
+                   href="/crm/{{ tenant.slug }}/analytics/"
+                   {% if current_page == 'analytics' %}aria-current="page"{% endif %}>
+                    <i class="bi bi-bar-chart me-1"></i>Analíticas
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if current_page == 'trash' %}active{% endif %}"
+                   href="/crm/{{ tenant.slug }}/trash/"
+                   {% if current_page == 'trash' %}aria-current="page"{% endif %}>
+                    <i class="bi bi-trash3 me-1"></i>Papelera
+                </a>
+            </li>
+        </ul>
+        <button type="button" class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Abrir filtros">
+            <i class="bi bi-funnel"></i>
+        </button>
+    </div>
+</nav>
