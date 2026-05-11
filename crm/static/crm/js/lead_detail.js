@@ -57,6 +57,21 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
     loadCurrentTags();
     loadAvailableTags();
 
+    var colorInput = document.getElementById('new-tag-color');
+    if (colorInput) {
+        colorInput.addEventListener('input', function(e) {
+            var hexSpan = document.getElementById('color-hex');
+            if (hexSpan) hexSpan.textContent = e.target.value;
+        });
+    }
+
+    var colors = ['#3498db', '#e74c3c', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e67e22', '#34495e', '#e91e63', '#00bcd4', '#8e44ad', '#27ae60'];
+    if (colorInput) {
+        colorInput.value = colors[Math.floor(Math.random() * colors.length)];
+        var hexSpan = document.getElementById('color-hex');
+        if (hexSpan) hexSpan.textContent = colorInput.value;
+    }
+
     window.updateStage = function() {
         var newStage = document.getElementById('stage-select').value;
         apiCall(apiBase + '/' + apiQuery, 'PATCH', { current_stage: newStage })
@@ -139,6 +154,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
             .then(function(data) {
                 currentTags = data.tags || [];
                 renderCurrentTags();
+                renderModalCurrentTags();
             })
             .catch(function() {
                 currentTags = [];
@@ -149,7 +165,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         apiCall(tenantApiBase, 'GET', null)
             .then(function(tags) {
                 availableTags = tags || [];
-                renderAvailableTagsDropdown();
+                renderModalAvailableTags();
             })
             .catch(function() {
                 availableTags = [];
@@ -178,9 +194,26 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         }).join('');
     }
 
-    function renderAvailableTagsDropdown() {
-        var container = document.getElementById('available-tags-list');
-        var noTagsAvailable = document.getElementById('no-tags-available');
+    function renderModalCurrentTags() {
+        var container = document.getElementById('modal-current-tags');
+        if (!container) return;
+
+        if (currentTags.length === 0) {
+            container.innerHTML = '<span class="text-muted small">Sin etiquetas asignadas</span>';
+            return;
+        }
+
+        container.innerHTML = currentTags.map(function(tag) {
+            var textColor = window.getContrastColor(tag.color);
+            return '<span class="tag-badge" style="background-color: ' + tag.color + '; color: ' + textColor + ';">' +
+                '<span class="tag-name">' + tag.name + '</span>' +
+                '<button type="button" class="tag-remove-btn" onclick="removeTag(' + tag.id + ')" title="Quitar etiqueta" style="color: ' + textColor + ';">&times;</button>' +
+                '</span>';
+        }).join('');
+    }
+
+    function renderModalAvailableTags() {
+        var container = document.getElementById('modal-available-tags');
         if (!container) return;
 
         var assignedIds = currentTags.map(function(t) { return t.id; });
@@ -189,21 +222,27 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         });
 
         if (unassignedTags.length === 0) {
-            container.innerHTML = '';
-            if (noTagsAvailable) noTagsAvailable.style.display = 'block';
+            container.innerHTML = '<span class="text-muted small">No hay más etiquetas disponibles</span>';
             return;
         }
 
-        if (noTagsAvailable) noTagsAvailable.style.display = 'none';
-
         container.innerHTML = unassignedTags.map(function(tag) {
             var textColor = window.getContrastColor(tag.color);
-            return '<li><a class="dropdown-item" href="#" onclick="addTag(' + tag.id + '); return false;" style="display: flex; align-items: center; gap: 8px;">' +
-                '<span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background-color: ' + tag.color + ';"></span>' +
-                '<span style="color: var(--color-text-primary);">' + tag.name + '</span>' +
-                '</a></li>';
+            return '<button type="button" class="btn btn-sm tag-option-btn" style="background-color: ' + tag.color + '; color: ' + textColor + '; border: none;" onclick="addTag(' + tag.id + ')">' +
+                '<i class="bi bi-plus"></i> ' + tag.name +
+                '</button>';
         }).join('');
     }
+
+    window.openTagsModal = function() {
+        loadCurrentTags();
+        loadAvailableTags();
+        var modalEl = document.getElementById('tagsModal');
+        if (modalEl) {
+            var modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    };
 
     window.addTag = function(tagId) {
         apiCall(apiBase + '/add_tag/' + apiQuery, 'POST', { tag_id: tagId })
@@ -224,26 +263,6 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
             .catch(function() {});
     };
 
-    window.showNewTagForm = function() {
-        var form = document.getElementById('new-tag-form');
-        if (form) {
-            form.style.display = 'block';
-            var input = document.getElementById('new-tag-name');
-            if (input) input.focus();
-            var colors = ['#3498db', '#e74c3c', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e67e22', '#34495e', '#e91e63', '#00bcd4'];
-            var randomColor = colors[Math.floor(Math.random() * colors.length)];
-            var colorInput = document.getElementById('new-tag-color');
-            if (colorInput) colorInput.value = randomColor;
-        }
-    };
-
-    window.hideNewTagForm = function() {
-        var form = document.getElementById('new-tag-form');
-        if (form) form.style.display = 'none';
-        var input = document.getElementById('new-tag-name');
-        if (input) input.value = '';
-    };
-
     window.createAndAssignTag = function() {
         var nameInput = document.getElementById('new-tag-name');
         var colorInput = document.getElementById('new-tag-color');
@@ -257,7 +276,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
 
         apiCall(tenantApiBase, 'POST', { name: name, color: color })
             .then(function(newTag) {
-                hideNewTagForm();
+                if (nameInput) nameInput.value = '';
                 return addTag(newTag.id);
             })
             .catch(function() {});

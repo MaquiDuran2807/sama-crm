@@ -46,7 +46,12 @@
 
         {% if lead.tags_list %}
         <hr style="border-color: var(--color-card-border); margin: 1rem 0;">
-        <p class="mb-2"><strong>Etiquetas:</strong></p>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="mb-0"><strong>Etiquetas:</strong></p>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openTagsModal()">
+                <i class="bi bi-tags"></i> Gestionar
+            </button>
+        </div>
         <div id="current-tags" class="d-flex flex-wrap gap-2 mb-2">
             {% for tag in lead.tags_list %}
             <span class="tag-badge" style="background-color: {{ tag.color }};">
@@ -56,43 +61,18 @@
             {% endfor %}
         </div>
         {% else %}
+        <hr style="border-color: var(--color-card-border); margin: 1rem 0;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="mb-0"><strong>Etiquetas:</strong></p>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openTagsModal()">
+                <i class="bi bi-tags"></i> Gestionar
+            </button>
+        </div>
         <div id="current-tags"></div>
-        {% endif %}
-
-        <div id="no-tags-message" class="mb-2" style="display: {% if lead.tags_list %}none{% else %}block{% endif %}; color: var(--color-text-muted); font-size: .85rem;">
+        <div id="no-tags-message" class="mb-2" style="color: var(--color-text-muted); font-size: .85rem;">
             Sin etiquetas
         </div>
-
-        <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="addTagDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-plus-lg"></i> Agregar etiqueta
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="addTagDropdown" style="max-height: 300px; overflow-y: auto; min-width: 220px;">
-                <li id="available-tags-list">
-                    {% for tag in lead.tags_list %}
-                    <span style="display:none;" data-tag-id="{{ tag.id }}"></span>
-                    {% endfor %}
-                </li>
-                <li id="no-tags-available" class="px-3 py-2 text-muted" style="display:none; font-size: .8rem;">
-                    Todas las etiquetas ya están asignadas
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li>
-                    <a class="dropdown-item" href="#" onclick="showNewTagForm(); return false;">
-                        <i class="bi bi-plus-circle"></i> Nueva etiqueta
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <div id="new-tag-form" class="mt-2" style="display: none;">
-            <div class="input-group input-group-sm">
-                <input type="text" id="new-tag-name" class="form-control" placeholder="Nombre de etiqueta" maxlength="50">
-                <input type="color" id="new-tag-color" class="form-control form-control-color" value="#3498db" style="width: 40px; padding: 2px;">
-                <button class="btn btn-outline-primary" type="button" onclick="createAndAssignTag()">Crear y asignar</button>
-                <button class="btn btn-outline-secondary" type="button" onclick="hideNewTagForm()">Cancelar</button>
-            </div>
-        </div>
+        {% endif %}
     </section>
 
     <!-- Panel de Cambio de Etapa y Notas -->
@@ -243,6 +223,65 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" id="confirm-delete-btn-detail" class="btn btn-danger">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal gestionar etiquetas -->
+<div class="modal fade" id="tagsModal" tabindex="-1" aria-labelledby="tagsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tagsModalLabel">
+                    <i class="bi bi-tags"></i> Gestionar Etiquetas
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Etiquetas asignadas actualmente -->
+                <div class="mb-4">
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Etiquetas actuales</h6>
+                    <div id="modal-current-tags" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted">Cargando...</span>
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--color-card-border);">
+
+                <!-- Crear nueva etiqueta -->
+                <div class="mb-4">
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Crear nueva etiqueta</h6>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-5">
+                            <input type="text" id="new-tag-name" class="form-control" placeholder="Nombre de la etiqueta" maxlength="50">
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="color" id="new-tag-color" class="form-control form-control-color" value="#3498db" style="width: 50px; height: 38px; cursor: pointer;">
+                                <span class="text-muted small" id="color-hex">#3498db</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100" onclick="createAndAssignTag()">
+                                <i class="bi bi-plus-circle"></i> Crear y asignar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--color-card-border);">
+
+                <!-- Todas las etiquetas disponibles -->
+                <div>
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Etiquetas disponibles</h6>
+                    <div id="modal-available-tags" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
