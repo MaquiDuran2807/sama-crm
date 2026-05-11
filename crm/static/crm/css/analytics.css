@@ -310,7 +310,7 @@
     border-radius: 20px;
     border: 1.5px solid var(--color-card-border);
     background: var(--color-surface);
-    color: var(--color-text-secondary);
+    color: var(--color-text-muted);
     font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
@@ -318,14 +318,16 @@
 }
 
 .phase-pill:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
+    opacity: 0.75;
+}
+
+.phase-pill:hover {
+    opacity: 0.8;
 }
 
 .phase-pill.active {
-    background: rgba(240, 101, 57, 0.15);
-    color: var(--color-accent);
-    border-color: var(--color-accent);
+    color: inherit;
+    border-color: inherit;
 }
 
 @media (max-width: 768px) {

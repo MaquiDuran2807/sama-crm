@@ -209,16 +209,27 @@ class Command(BaseCommand):
         return fields_created
 
     def _crear_contactos(self, tenant: Tenant) -> list[Contact]:
-        """Genera 50 contactos con nombres realistas."""
-        contacts = []
-        cities = list(City.objects.all())
+        """Genera 50 contactos con ciudades de la BD que tienen coordenadas."""
+        from crm.models import City
 
-        if not cities:
+        contacts = []
+
+        all_cities = list(City.objects.filter(latitude__isnull=False, longitude__isnull=False))
+
+        if not all_cities:
             dept, _ = Department.objects.get_or_create(name="Cundinamarca")
-            cities_data = ["Bogota", "Cali", "Medellin", "Barranquilla", "Cartagena", "Bucaramanga"]
-            for city_name in cities_data:
-                city, _ = City.objects.get_or_create(department=dept, name=city_name)
-                cities.append(city)
+            fallback = [
+                ("Bogotá", "Cundinamarca"),
+                ("Cali", "Valle del Cauca"),
+                ("Medellín", "Antioquia"),
+                ("Barranquilla", "Atlántico"),
+                ("Cartagena", "Bolívar"),
+                ("Bucaramanga", "Santander"),
+            ]
+            for city_name, dept_name in fallback:
+                d, _ = Department.objects.get_or_create(name=dept_name)
+                c, _ = City.objects.get_or_create(department=d, name=city_name)
+                all_cities.append(c)
 
         generos = ["F"] * 25 + ["M"] * 25
 
@@ -233,7 +244,7 @@ class Command(BaseCommand):
             nombre_completo = f"{nombre} {apellido}"
             email = f"{nombre.lower()}.{apellido.lower()}{i}@example.com"
             telefono = f"+57 300 {random.randint(100, 999)} {random.randint(1000, 9999)}"
-            city = random.choice(cities)
+            city = random.choice(all_cities)
 
             contact, created = Contact.objects.get_or_create(
                 tenant=tenant,
@@ -280,20 +291,18 @@ class Command(BaseCommand):
             if random.random() > 0.3:
                 last_contacted = created_at + timedelta(days=random.randint(1, 30))
 
-            lead, _ = Lead.objects.get_or_create(
+            lead = Lead.objects.create(
                 tenant=tenant,
                 contact=contact,
                 current_stage=stage,
-                defaults={
-                    "product_of_interest": random.choice(self.PRODUCTOS),
-                    "product_category": random.choice(self.CATEGORIAS),
-                    "notes": f"Lead generado automaticamente - Producto: {random.choice(self.PRODUCTOS)}",
-                    "is_closed": is_closed,
-                    "closed_result": closed_result,
-                    "custom_fields": {"source": "seed_solar_client"},
-                    "skipped_stages": [],
-                    "last_contacted_at": last_contacted,
-                },
+                product_of_interest=random.choice(self.PRODUCTOS),
+                product_category=random.choice(self.CATEGORIAS),
+                notes=f"Lead generado automaticamente - Producto: {random.choice(self.PRODUCTOS)}",
+                is_closed=is_closed,
+                closed_result=closed_result,
+                custom_fields={"source": "seed_solar_client"},
+                skipped_stages=[],
+                last_contacted_at=last_contacted,
             )
 
             Lead.objects.filter(pk=lead.pk).update(
