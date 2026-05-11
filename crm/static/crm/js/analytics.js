@@ -14,61 +14,66 @@
     var selectedPhases = new Set();
 
     var deptNameToSVGId = {
-        'amazonas': 'AMA', 'antioquia': 'ANT', 'arauca': 'ARA', 'atlántico': 'ATL',
-        'bogotá d.c.': 'DC', 'bogotá': 'DC',
-        'bolívar': 'BOL', 'boyacá': 'BOY', 'caldas': 'CAL', 'caquetá': 'CAQ',
-        'casanare': 'CAS', 'cauca': 'CAU', 'cesar': 'CES', 'chocó': 'CHO',
-        'córdoba': 'COR', 'cundinamarca': 'CUN',
-        'guainía': 'GUA', 'guaviare': 'GUV', 'huila': 'HUI',
+        'amazonas': 'AMA', 'antioquia': 'ANT', 'arauca': 'ARA', 'atlantico': 'ATL',
+        'bogota d.c.': 'DC', 'bogota': 'DC',
+        'bolivar': 'BOL', 'boyaca': 'BOY', 'caldas': 'CAL', 'caqueta': 'CAQ',
+        'casanare': 'CAS', 'cauca': 'CAU', 'cesar': 'CES', 'choco': 'CHO',
+        'cordoba': 'COR', 'cundinamarca': 'CUN',
+        'guainia': 'GUA', 'guaviare': 'GUV', 'huila': 'HUI',
         'la guajira': 'LAG',
         'magdalena': 'MAG', 'meta': 'MET',
-        'nariño': 'NAR', 'norte de santander': 'NSA',
-        'putumayo': 'PUT', 'quindío': 'QUI', 'risaralda': 'RIS',
+        'narino': 'NAR', 'norte de santander': 'NSA',
+        'putumayo': 'PUT', 'quindio': 'QUI', 'risaralda': 'RIS',
         'santander': 'SAN', 'sucre': 'SUC',
-        'san andrés y providencia': 'SAP',
+        'san andres y providencia': 'SAP',
         'tolima': 'TOL', 'valle del cauca': 'VAC',
-        'vaupés': 'VAU', 'vichada': 'VID'
+        'vaupes': 'VAU', 'vichada': 'VID'
     };
 
-    var periodLabels = {
-        7: { singular: 'semana', plural: 'semanas', day: 7 },
-        30: { singular: 'mes', plural: 'meses', day: 30 },
-        90: { singular: 'trimestre', plural: 'trimestres', day: 90 },
-        365: { singular: 'ano', plural: 'anos', day: 365 },
-        0: { singular: 'todo', plural: 'todo', day: 0 },
-    };
-
-    var monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
     var darkColors = {
-        bg: '#1a1d24',
-        surface: '#21252e',
-        card: '#262b36',
-        border: '#313849',
-        text: '#d4d8e3',
-        muted: '#6b7385',
-        accent: '#f06539',
-        success: '#2ec27e',
-        warning: '#f5a623',
-        info: '#3b82f6',
+        bg: '#1a1d24', surface: '#21252e', card: '#262b36',
+        border: '#313849', text: '#d4d8e3', muted: '#6b7385',
+        accent: '#f06539', success: '#2ec27e', warning: '#f5a623', info: '#3b82f6',
     };
 
     var lightColors = {
-        bg: '#f5f6f8',
-        surface: '#ffffff',
-        card: '#ffffff',
-        border: '#e2e6ed',
-        text: '#1a1d24',
-        muted: '#6b7385',
-        accent: '#f06539',
-        success: '#2ec27e',
-        warning: '#f5a623',
-        info: '#3b82f6',
+        bg: '#f5f6f8', surface: '#ffffff', card: '#ffffff',
+        border: '#e2e6ed', text: '#1a1d24', muted: '#6b7385',
+        accent: '#f06539', success: '#2ec27e', warning: '#f5a623', info: '#3b82f6',
+    };
+
+    var stageColors = {
+        'Lead': '#3b82f6',
+        'Calificacion': '#8b5cf6',
+        'Cotizacion Enviada': '#f5a623',
+        'Seguimiento': '#06b6d4',
+        'Cerrado Ganado': '#2ec27e',
+        'Cerrado Perdido': '#ef4444',
+        'Cotización Enviada': '#f5a623',
     };
 
     function getColors() {
         var theme = localStorage.getItem('sama-crm-theme') || 'dark';
         return theme === 'light' ? lightColors : darkColors;
+    }
+
+    function getViewMode(days) {
+        if (days === 0) return 'monthly';
+        if (days <= 30) return 'daily';
+        if (days <= 90) return 'weekly';
+        if (days <= 365) return 'monthly';
+        return 'quarterly';
+    }
+
+    function formatDateRange(start, end) {
+        var startStr = start.getDate() + ' ' + months[start.getMonth()].substring(0, 3);
+        var endStr = end.getDate() + ' ' + months[end.getMonth()].substring(0, 3);
+        if (start.getFullYear() !== end.getFullYear()) {
+            return startStr + ' ' + start.getFullYear() + ' - ' + endStr + ' ' + end.getFullYear();
+        }
+        return startStr + ' - ' + endStr;
     }
 
     function getPeriodLabel() {
@@ -86,27 +91,9 @@
         return 'Ultimos ' + currentDays + ' dias';
     }
 
-    function formatDateRange(start, end) {
-        var startStr = start.getDate() + ' ' + monthNames[start.getMonth()].substring(0, 3);
-        var endStr = end.getDate() + ' ' + monthNames[end.getMonth()].substring(0, 3);
-        if (start.getFullYear() !== end.getFullYear()) {
-            return startStr + ' ' + start.getFullYear() + ' - ' + endStr + ' ' + end.getFullYear();
-        }
-        return startStr + ' - ' + endStr;
-    }
-
     function updatePeriodLabel() {
         var el = document.getElementById('current-period-label');
         if (el) el.textContent = getPeriodLabel();
-    }
-
-    function normalizeDepartmentName(name) {
-        if (!name) return '';
-        return name.toLowerCase()
-            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, '_')
-            .trim();
     }
 
     function normalizeDeptKey(name) {
@@ -132,15 +119,11 @@
     }
 
     function fetchAnalytics() {
-        var url = '/api/crm/tenants/' + tenantSlug + '/analytics/';
-        var params = [];
-        if (currentDays > 0) params.push('days=' + currentDays);
-        if (currentOffset !== 0) params.push('offset=' + currentOffset);
-        if (currentSource) params.push('source=' + encodeURIComponent(currentSource));
-        if (params.length) url += '?' + params.join('&');
-
-        updatePeriodLabel();
-        updateNavButtons();
+        var since = currentDays > 0
+            ? new Date(Date.now() - (currentDays + currentOffset * currentDays) * 86400000).toISOString().split('T')[0]
+            : '';
+        var url = '/api/crm/tenants/' + tenantSlug + '/analytics/?days=' + currentDays + '&offset=' + currentOffset + '&source=' + encodeURIComponent(currentSource);
+        if (since) url += '&since=' + since;
 
         fetch(url, {
             headers: {
@@ -149,8 +132,8 @@
         })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
-            console.log('[Analytics] fetched data keys:', Object.keys(data || {}));
             if (!data) return;
+
             renderStats(data.summary);
             renderMap(data.leads_by_region || []);
             renderRegionTable(data.leads_geocoded || []);
@@ -159,17 +142,31 @@
 
             leadsByStage = data.leads_by_stage || {};
             pipelineStages = data.pipeline_stages || [];
+
+            var previousSelection = {};
+            selectedPhases.forEach(function(v) { previousSelection[v] = true; });
+
             renderPhaseSelector();
+
+            var stageNames = pipelineStages.map(function(s) { return s.name || s; });
+            stageNames.forEach(function(name) {
+                if (previousSelection.hasOwnProperty(name)) {
+                    selectedPhases.add(name);
+                }
+            });
 
             renderTimeChart(
                 data.leads_by_day || [],
                 data.leads_by_stage_won || [],
                 data.leads_by_stage_lost || [],
                 data.quotes_sent || [],
-                leadsByStage
+                leadsByStage,
+                stageNames
             );
             currentGeocodedData = data.leads_geocoded || [];
             renderSVGMap(currentGeocodedData);
+            updateNavButtons();
+            updatePeriodLabel();
         })
         .catch(function(e) { console.error('Analytics error:', e); });
     }
@@ -342,17 +339,13 @@
             return;
         }
 
-        var metric = currentMapMetric;
         var html = '';
         geocodedData.forEach(function(r) {
             var total = r.total || 0;
             var won = r.won || 0;
             var lost = r.lost || 0;
             var conversion = total > 0 ? Math.round((won / total) * 100) : 0;
-            var intensity = r.intensidad || 0;
-            var intensityWon = r.intensidad_won || 0;
-            var conversionNorm = conversion / 100;
-            var mapIntensity = getMapIntensity(r, metric);
+            var mapIntensity = getMapIntensity(r, currentMapMetric);
             var barColor = getMapColor(mapIntensity);
             var barWidth = Math.round(mapIntensity * 100);
 
@@ -372,9 +365,8 @@
         tbody.innerHTML = html;
     }
 
-function renderSVGMap(geocodedData) {
+    function renderSVGMap(geocodedData) {
         var container = document.getElementById('colombia-svg-map');
-        console.log('[SVGMap] container:', container, 'data:', (geocodedData || []).length);
         if (!container) return;
 
         fetch('/static/crm/img/colombia.svg')
@@ -415,13 +407,9 @@ function renderSVGMap(geocodedData) {
                     if (data) {
                         var intensity = getMapIntensity(data, currentMapMetric);
                         var color = getMapColor(intensity);
-
                         newPath.style.fill = color;
 
                         newPath.addEventListener('mouseenter', function(e) {
-                            var metric = currentMapMetric;
-                            var val = getMapValue(data, metric);
-                            var suffix = metric === 'conversion' ? '%' : '';
                             var won = data.won || 0;
                             var lost = data.lost || 0;
                             var total = data.total || 0;
@@ -441,8 +429,6 @@ function renderSVGMap(geocodedData) {
                         newPath.style.fill = 'var(--color-muted)';
                     }
                 });
-
-                console.log('[SVG Map] rendered ' + geocodedData.length + ' departments');
             })
             .catch(function(e) { console.error('[SVG Map] failed to load:', e); });
     }
@@ -535,23 +521,6 @@ function renderSVGMap(geocodedData) {
             return samaGradient[Math.min(idx + 1, samaGradient.length - 1)];
         });
 
-        var barWidths = funnelData.map(function(f, i) {
-            var pct = totalLeads > 0 ? (f.count / totalLeads) : 0;
-            return Math.max(pct, 0.05);
-        });
-
-        var datasets = funnelData.map(function(f, i) {
-            return {
-                label: f.stage,
-                data: [f.count],
-                backgroundColor: samaGradient[Math.min(i, samaGradient.length - 1)],
-                borderColor: '#ffffff',
-                borderWidth: 1,
-                barPercentage: 0.6,
-                categoryPercentage: 0.8,
-            };
-        });
-
         var ctx = canvas.getContext('2d');
         var colors = getColors();
 
@@ -639,7 +608,7 @@ function renderSVGMap(geocodedData) {
         var labels = sourceMonthlyData.map(function(r) {
             var parts = r.month.split('-');
             var monthIdx = parseInt(parts[1], 10) - 1;
-            return monthNames[monthIdx].substring(0, 3) + ' ' + parts[0];
+            return months[monthIdx].substring(0, 3) + ' ' + parts[0];
         });
 
         var datasets = platforms.map(function(p) {
@@ -695,9 +664,119 @@ function renderSVGMap(geocodedData) {
         });
     }
 
-    function renderTimeChart(dayData, wonData, lostData, quoteData, stageData) {
+    function groupDataByPeriod(dataArray, viewMode) {
+        var result = {};
+
+        if (viewMode === 'daily') {
+            dataArray.forEach(function(d) {
+                var parts = d.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var day = parseInt(parts[2], 10);
+                var key = day + ' ' + months[month];
+                if (!result[key]) result[key] = { count: 0, year: year, month: month, day: day, sortKey: String(year) + String(month).padStart(2, '0') + String(day).padStart(2, '0') };
+                result[key].count += d.count;
+            });
+        } else if (viewMode === 'weekly') {
+            dataArray.forEach(function(d) {
+                var parts = d.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var day = parseInt(parts[2], 10);
+                var dObj = new Date(year, month, day);
+                var weekNum = getWeekNumber(dObj);
+                var key = 'S' + weekNum + ' ' + months[month].substring(0, 3);
+                if (!result[key]) result[key] = { count: 0, year: year, month: month, week: weekNum, sortKey: String(year) + String(month).padStart(2, '0') + String(weekNum).padStart(2, '0') };
+                result[key].count += d.count;
+            });
+        } else if (viewMode === 'monthly') {
+            dataArray.forEach(function(d) {
+                var parts = d.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var key = months[month] + ' ' + year;
+                if (!result[key]) result[key] = { count: 0, year: year, month: month, sortKey: String(year) + String(month).padStart(2, '0') };
+                result[key].count += d.count;
+            });
+        } else if (viewMode === 'quarterly') {
+            dataArray.forEach(function(d) {
+                var parts = d.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var quarter = Math.floor(month / 3) + 1;
+                var key = 'Q' + quarter + ' ' + year;
+                if (!result[key]) result[key] = { count: 0, year: year, quarter: quarter, sortKey: String(year) + String(quarter) };
+                result[key].count += d.count;
+            });
+        }
+
+        var sortedKeys = Object.keys(result).sort(function(a, b) {
+            return result[a].sortKey.localeCompare(result[b].sortKey);
+        });
+
+        return {
+            labels: sortedKeys,
+            values: sortedKeys.map(function(k) { return result[k].count; })
+        };
+    }
+
+    function getWeekNumber(date) {
+        var d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        var dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function buildStageDataMap(stageData, stageName, viewMode) {
+        var records = stageData[stageName] || [];
+        var map = {};
+        var months2 = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+        if (viewMode === 'daily') {
+            records.forEach(function(r) {
+                var parts = r.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var day = parseInt(parts[2], 10);
+                var key = day + ' ' + months2[month];
+                map[key] = (map[key] || 0) + r.count;
+            });
+        } else if (viewMode === 'weekly') {
+            records.forEach(function(r) {
+                var parts = r.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var day = parseInt(parts[2], 10);
+                var dObj = new Date(year, month, day);
+                var weekNum = getWeekNumber(dObj);
+                var key = 'S' + weekNum + ' ' + months2[month].substring(0, 3);
+                map[key] = (map[key] || 0) + r.count;
+            });
+        } else if (viewMode === 'monthly') {
+            records.forEach(function(r) {
+                var parts = r.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var key = months2[month] + ' ' + year;
+                map[key] = (map[key] || 0) + r.count;
+            });
+        } else if (viewMode === 'quarterly') {
+            records.forEach(function(r) {
+                var parts = r.date.split('-');
+                var year = parseInt(parts[0], 10);
+                var month = parseInt(parts[1], 10) - 1;
+                var quarter = Math.floor(month / 3) + 1;
+                var key = 'Q' + quarter + ' ' + year;
+                map[key] = (map[key] || 0) + r.count;
+            });
+        }
+
+        return map;
+    }
+
+    function renderTimeChart(dayData, wonData, lostData, quoteData, stageData, stageNames) {
         var canvas = document.getElementById('timeline-chart');
-        console.log('[Timeline] canvas:', canvas, 'dayData length:', (dayData || []).length);
         if (!canvas) return;
 
         if (charts.timeline) {
@@ -705,191 +784,106 @@ function renderSVGMap(geocodedData) {
             delete charts.timeline;
         }
 
-        var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        var isMonthlyView = dayData.length > 45;
+        var viewMode = getViewMode(currentDays);
 
-        var dataMap = {};
-        (dayData || []).forEach(function(d) {
-            dataMap[d.date] = { new: d.count, won: 0, lost: 0, quote: 0 };
-        });
-        (wonData || []).forEach(function(d) {
-            if (dataMap[d.date]) dataMap[d.date].won = d.count;
-            else dataMap[d.date] = { new: 0, won: d.count, lost: 0, quote: 0 };
-        });
-        (lostData || []).forEach(function(d) {
-            if (dataMap[d.date]) dataMap[d.date].lost = d.count;
-            else dataMap[d.date] = { new: 0, won: 0, lost: d.count, quote: 0 };
-        });
-        (quoteData || []).forEach(function(d) {
-            if (dataMap[d.date]) dataMap[d.date].quote = d.count;
-            else dataMap[d.date] = { new: 0, won: 0, lost: 0, quote: d.count };
-        });
+        var newGrouped = groupDataByPeriod(dayData, viewMode);
+        var wonGrouped = groupDataByPeriod(wonData, viewMode);
+        var lostGrouped = groupDataByPeriod(lostData, viewMode);
+        var quoteGrouped = groupDataByPeriod(quoteData, viewMode);
 
-        var sortedDates = Object.keys(dataMap).sort();
-        var groupedData = {};
-
-        if (isMonthlyView) {
-            sortedDates.forEach(function(dateStr) {
-                var d = new Date(dateStr);
-                var key = months[d.getMonth()] + ' ' + d.getFullYear();
-                if (!groupedData[key]) {
-                    groupedData[key] = { new: 0, won: 0, lost: 0, quote: 0, year: d.getFullYear(), month: d.getMonth() };
-                }
-                var m = dataMap[dateStr];
-                groupedData[key].new += m.new;
-                groupedData[key].won += m.won;
-                groupedData[key].lost += m.lost;
-                groupedData[key].quote += m.quote;
-            });
-        } else {
-            sortedDates.forEach(function(dateStr) {
-                var d = new Date(dateStr);
-                var key = d.getDate() + ' ' + months[d.getMonth()];
-                groupedData[key] = {
-                    new: dataMap[dateStr].new,
-                    won: dataMap[dateStr].won,
-                    lost: dataMap[dateStr].lost,
-                    quote: dataMap[dateStr].quote,
-                    year: d.getFullYear(),
-                    month: d.getMonth()
-                };
-            });
-        }
-
-        var keys = Object.keys(groupedData).sort(function(a, b) {
-            var da = groupedData[a], db = groupedData[b];
-            if (da.year !== db.year) return da.year - db.year;
-            return da.month - db.month;
-        });
-
-        var dayLabels = keys;
-        var newCounts = keys.map(function(k) { return groupedData[k].new; });
-        var wonCounts = keys.map(function(k) { return groupedData[k].won; });
-        var lostCounts = keys.map(function(k) { return groupedData[k].lost; });
-        var quoteCounts = keys.map(function(k) { return groupedData[k].quote; });
+        var dayLabels = newGrouped.labels;
+        var newCounts = newGrouped.values;
+        var wonCounts = wonGrouped.values;
+        var lostCounts = lostGrouped.values;
+        var quoteCounts = quoteGrouped.values;
 
         var ctx = canvas.getContext('2d');
         var colors = getColors();
 
-        var stageColors = {
-            'Leads nuevos': '#3b82f6',
-            'Cerrados Ganados': '#2ec27e',
-            'Cerrados Perdidos': '#ef4444',
-            'Cotizaciones Enviadas': '#f5a623',
-        };
+        var datasets = [];
 
-        var datasets = [
-            {
-                label: 'Leads nuevos',
-                data: newCounts,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 3,
-                pointBackgroundColor: '#3b82f6',
-                borderWidth: 2,
-            },
-            {
-                label: 'Cerrados Ganados',
-                data: wonCounts,
-                borderColor: '#2ec27e',
-                backgroundColor: 'transparent',
-                borderDash: [5, 5],
-                tension: 0.3,
-                pointRadius: 2,
-                pointBackgroundColor: '#2ec27e',
-                borderWidth: 2,
-            },
-            {
-                label: 'Cerrados Perdidos',
-                data: lostCounts,
-                borderColor: '#ef4444',
-                backgroundColor: 'transparent',
-                borderDash: [5, 5],
-                tension: 0.3,
-                pointRadius: 2,
-                pointBackgroundColor: '#ef4444',
-                borderWidth: 2,
-            },
-            {
-                label: 'Cotizaciones Enviadas',
-                data: quoteCounts,
-                borderColor: '#f5a623',
-                backgroundColor: 'transparent',
-                borderDash: [2, 2],
-                tension: 0.3,
-                pointRadius: 2,
-                pointBackgroundColor: '#f5a623',
-                borderWidth: 2,
-            }
-        ];
+        datasets.push({
+            label: 'Leads nuevos',
+            data: newCounts,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#3b82f6',
+            borderWidth: 2,
+        });
 
-        var stageObj;
-        var borderStyle;
-        var order;
-        var records;
-        var stageDataMap;
-        var stageCounts;
-        var parts;
-        var dateStr;
-        var monthIdx;
-        var year;
-        var colorIdx;
-        var hue;
-        var stageColor;
+        datasets.push({
+            label: 'Cerrados Ganados',
+            data: wonCounts,
+            borderColor: '#2ec27e',
+            backgroundColor: 'rgba(46, 194, 126, 0.08)',
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 2,
+            pointBackgroundColor: '#2ec27e',
+            borderWidth: 2,
+        });
 
-        Object.keys(stageData || {}).forEach(function(stageName) {
-            if (stageName === 'Leads nuevos' || stageName === 'Cerrados Ganados' ||
-                stageName === 'Cerrados Perdidos' || stageName === 'Cotizaciones Enviadas') {
-                return;
-            }
-            colorIdx = Object.keys(stageColors).length + (Object.keys(stageColors).indexOf(stageName) % 8);
-            hue = (colorIdx * 45) % 360;
-            stageColor = 'hsl(' + hue + ', 65%, 55%)';
-            stageDataMap = {};
-            records = stageData[stageName] || [];
-            records.forEach(function(r) {
-                stageDataMap[r.date] = r.count;
-            });
-            stageCounts = keys.map(function(k) {
-                parts = k.split(' ');
-                if (parts.length === 2 && /^\d+$/.test(parts[0])) {
-                    monthIdx = months.indexOf(parts[1]);
-                    if (monthIdx >= 0) {
-                        year = new Date().getFullYear();
-                        dateStr = parts[0].padStart(2, '0') + '-' + String(monthIdx + 1).padStart(2, '0') + '-' + year;
-                    } else {
-                        dateStr = k;
-                    }
-                } else {
-                    dateStr = k;
-                }
-                return stageDataMap[dateStr] || 0;
-            });
-            stageObj = null;
-            borderStyle = [5, 5];
+        datasets.push({
+            label: 'Cerrados Perdidos',
+            data: lostCounts,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+            borderDash: [5, 5],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 2,
+            pointBackgroundColor: '#ef4444',
+            borderWidth: 2,
+        });
+
+        datasets.push({
+            label: 'Cotizaciones Enviadas',
+            data: quoteCounts,
+            borderColor: '#f5a623',
+            backgroundColor: 'rgba(245, 166, 35, 0.08)',
+            borderDash: [2, 2],
+            fill: false,
+            tension: 0.3,
+            pointRadius: 2,
+            pointBackgroundColor: '#f5a623',
+            borderWidth: 2,
+        });
+
+        stageNames.forEach(function(stageName) {
+            var color = stageColors[stageName] || '#6b7385';
+            var stageObj = null;
             for (var si = 0; si < pipelineStages.length; si++) {
-                if (pipelineStages[si].name === stageName) {
+                if ((pipelineStages[si].name || pipelineStages[si]) === stageName) {
                     stageObj = pipelineStages[si];
                     break;
                 }
             }
-            if (stageObj) {
-                order = stageObj.order || 1;
+
+            var borderStyle = [5, 5];
+            if (stageObj && stageObj.order) {
+                var order = stageObj.order;
                 if (order % 2 === 0) borderStyle = [2, 2];
                 else if (order % 3 === 0) borderStyle = [10, 5];
             }
+
+            var stageMap = buildStageDataMap(stageData, stageName, viewMode);
+            var stageCounts = dayLabels.map(function(label) { return stageMap[label] || 0; });
+
             datasets.push({
                 label: stageName,
                 data: stageCounts,
-                borderColor: stageColor,
-                backgroundColor: 'transparent',
-                borderDash: borderStyle,
+                borderColor: color,
+                backgroundColor: color + '15',
+                fill: false,
                 tension: 0.3,
-                pointRadius: 1.5,
-                pointBackgroundColor: stageColor,
+                pointRadius: 2,
+                pointBackgroundColor: color,
                 borderWidth: 1.5,
+                borderDash: borderStyle,
             });
         });
 
@@ -932,14 +926,18 @@ function renderSVGMap(geocodedData) {
                         grid: { color: colors.border },
                     },
                     y: {
-                        ticks: { color: colors.muted },
+                        ticks: {
+                            color: colors.muted,
+                            callback: function(v) { return Number.isInteger(v) ? v : ''; }
+                        },
                         grid: { color: colors.border },
                         beginAtZero: true,
+                        suggestedMin: 0,
                     },
                 },
             },
         });
-}
+    }
 
     function renderPhaseSelector() {
         var container = document.getElementById('phase-selector');
@@ -947,27 +945,22 @@ function renderSVGMap(geocodedData) {
 
         selectedPhases = new Set();
 
-        var defaults = ['Leads nuevos', 'Cerrados Ganados', 'Cerrados Perdidos', 'Cotizaciones Enviadas'];
-
         container.innerHTML = '';
+
         pipelineStages.forEach(function(stage) {
             var name = stage.name || stage;
-            var color = stage.color || '#6b7385';
-            var isDefault = defaults.some(function(d) {
-                return d.toLowerCase() === name.toLowerCase();
-            });
+            var color = stage.color || stageColors[name] || '#6b7385';
 
             var pill = document.createElement('button');
-            pill.className = 'phase-pill' + (isDefault ? ' active' : '');
+            pill.className = 'phase-pill active';
             pill.style.borderColor = color;
-            pill.style.color = isDefault ? color : 'var(--color-text-secondary)';
-            if (isDefault) {
-                pill.style.background = color + '22';
-                selectedPhases.add(name);
-            }
+            pill.style.color = color;
+            pill.style.background = color + '22';
             pill.textContent = name;
             pill.dataset.stage = name;
             pill.dataset.color = color;
+            selectedPhases.add(name);
+
             pill.addEventListener('click', function() {
                 togglePhase(pill, name);
             });
@@ -993,23 +986,15 @@ function renderSVGMap(geocodedData) {
     }
 
     function updateTimelineChart() {
-        console.log('[updateTimelineChart] selectedPhases size:', selectedPhases.size, 'chart:', !!charts.timeline, 'allDatasets:', timelineAllDatasets.length);
-        if (!charts.timeline) {
-            console.log('[updateTimelineChart] no timeline chart to update');
-            return;
-        }
-        if (timelineAllDatasets.length === 0) {
-            console.log('[updateTimelineChart] no datasets stored');
-            return;
-        }
+        if (!charts.timeline) return;
+        if (timelineAllDatasets.length === 0) return;
 
         var newDatasets = selectedPhases.size > 0
             ? timelineAllDatasets.filter(function(ds) { return selectedPhases.has(ds.label); })
             : timelineAllDatasets.slice();
 
-        console.log('[updateTimelineChart] showing', newDatasets.length, 'datasets of', timelineAllDatasets.length);
         charts.timeline.data.datasets = newDatasets;
-        charts.timeline.update();
+        charts.timeline.update('none');
     }
 
     function applyTheme() {
