@@ -9,6 +9,9 @@ obtener resenas IA y calcular metricas del pipeline.
 
 from collections import defaultdict
 from datetime import timedelta
+from functools import lru_cache
+import unicodedata
+from pathlib import Path
 from typing import Any
 
 from django.db.models import Avg, Count, Q
@@ -743,6 +746,42 @@ class PipelineConfigView(LoginRequiredMixin, View):
         return render(request, self.template_name, context)
 
 
+@lru_cache(maxsize=1)
+def _normalize_city_key(name: str) -> str:
+    """Normaliza un nombre de ciudad para busqueda en el diccionario de coordenadas."""
+    normalized = unicodedata.normalize("NFD", name)
+    normalized = normalized.translate({c: "" for c in range(0x0300, 0x0370)})
+    return normalized.lower()
+
+
+def load_city_coordinates() -> dict[str, dict[str, float]]:
+    """Carga coordenadas de ciudades desde el CSV estatico.
+
+    Returns:
+        Dict mapping normalized city names to {latitud, longitud}.
+    """
+    import csv
+
+    cities_path = Path(__file__).resolve().parent.parent / "static" / "crm" / "data" / "ciudades_colombia.csv"
+    coords: dict[str, dict[str, float]] = {}
+
+    try:
+        with cities_path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                raw = row.get("nombre", "").strip()
+                if raw:
+                    key = _normalize_city_key(raw)
+                    coords[key] = {
+                        "latitud": float(row["latitud"]),
+                        "longitud": float(row["longitud"]),
+                    }
+    except FileNotFoundError:
+        pass
+
+    return coords
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def analytics_api(request, tenant_slug: str):
@@ -919,7 +958,56 @@ def analytics_api(request, tenant_slug: str):
         })
     leads_by_region.sort(key=lambda x: x["total"], reverse=True)
 
-    # ── Leads by source monthly ──
+    # ── Leads geocoded for heatmap (grouped by department) ──
+    import csv
+    import os
+
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "static", "crm", "data")
+
+    dept_coords = {}
+    with open(os.path.join(static_dir, "departamentos_colombia.csv"), encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            dept_coords[row["nombre"].strip()] = (float(row["latitud"]), float(row["longitud"]))
+
+    dept_counts = defaultdict(int)
+    dept_won = defaultdict(int)
+    dept_lost = defaultdict(int)
+
+    for lead in (
+        leads_qs.filter(contact__isnull=False, contact__city__isnull=False)
+        .select_related("contact__city__department")
+    ):
+        city_obj = lead.contact.city
+        if city_obj and city_obj.department and city_obj.department.name in dept_coords:
+            dept = city_obj.department.name
+            dept_counts[dept] += 1
+            if lead.is_closed:
+                if lead.closed_result == "won":
+                    dept_won[dept] += 1
+                elif lead.closed_result == "lost":
+                    dept_lost[dept] += 1
+
+    max_total = max(dept_counts.values()) if dept_counts else 1
+    max_won = max(dept_won.values()) if dept_won else 1
+
+    leads_geocoded = [
+        {
+            "latitud": lat,
+            "longitud": lng,
+            "departamento": dept,
+            "total": dept_counts[dept],
+            "won": dept_won.get(dept, 0),
+            "lost": dept_lost.get(dept, 0),
+            "intensidad": round(min(1.0, (dept_counts[dept] / max_total) ** 0.7), 2),
+            "intensidad_won": round(min(1.0, (dept_won.get(dept, 0) / max_won) ** 0.7), 2),
+        }
+        for dept, (lat, lng) in dept_coords.items()
+        if dept_counts.get(dept, 0) > 0
+    ]
+
+    leads_geocoded.sort(key=lambda x: x["total"], reverse=True)
+
+# ── Leads by source monthly ──
     monthly_platforms = ["meta", "google", "tiktok", "web", "referral"]
     monthly_data = defaultdict(lambda: {p: 0 for p in monthly_platforms})
 
@@ -941,6 +1029,27 @@ def analytics_api(request, tenant_slug: str):
         for month in sorted(monthly_data.keys())
     ]
 
+    # ── Stage counts by date (all phases) ──
+    stage_date_counts = (
+        leads_qs.extra(select={"day": "DATE(created_at)"})
+        .values("day", "current_stage")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    stage_by_date = defaultdict(lambda: defaultdict(int))
+    for row in stage_date_counts:
+        day = row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"])
+        stage = row["current_stage"] or "unknown"
+        stage_by_date[day][stage] = row["count"]
+
+    leads_by_stage = {
+        stage["name"]: [
+            {"date": day, "count": stage_by_date[day].get(stage["name"], 0)}
+            for day in sorted(stage_by_date.keys())
+        ]
+        for stage in pipeline_stages
+    }
+
     return Response({
         "funnel": funnel,
         "leads_by_source": leads_by_source,
@@ -949,7 +1058,10 @@ def analytics_api(request, tenant_slug: str):
         "leads_by_stage_lost": leads_by_stage_lost,
         "quotes_sent": quotes_sent,
         "leads_by_region": leads_by_region,
+        "leads_geocoded": leads_geocoded,
         "leads_by_source_monthly": leads_by_source_monthly,
+        "leads_by_stage": leads_by_stage,
+        "pipeline_stages": pipeline_stages,
         "summary": {
             "total_leads": total_leads,
             "won_leads": won_leads,

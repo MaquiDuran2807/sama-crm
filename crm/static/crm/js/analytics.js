@@ -6,6 +6,29 @@
     var currentSource = '';
     var charts = {};
     var currentOffset = 0;
+    var currentGeocodedData = null;
+    var currentMapMetric = 'total';
+    var timelineAllDatasets = [];
+    var leadsByStage = {};
+    var pipelineStages = [];
+    var selectedPhases = new Set();
+
+    var deptNameToSVGId = {
+        'amazonas': 'AMA', 'antioquia': 'ANT', 'arauca': 'ARA', 'atlántico': 'ATL',
+        'bogotá d.c.': 'DC', 'bogotá': 'DC',
+        'bolívar': 'BOL', 'boyacá': 'BOY', 'caldas': 'CAL', 'caquetá': 'CAQ',
+        'casanare': 'CAS', 'cauca': 'CAU', 'cesar': 'CES', 'chocó': 'CHO',
+        'córdoba': 'COR', 'cundinamarca': 'CUN',
+        'guainía': 'GUA', 'guaviare': 'GUV', 'huila': 'HUI',
+        'la guajira': 'LAG',
+        'magdalena': 'MAG', 'meta': 'MET',
+        'nariño': 'NAR', 'norte de santander': 'NSA',
+        'putumayo': 'PUT', 'quindío': 'QUI', 'risaralda': 'RIS',
+        'santander': 'SAN', 'sucre': 'SUC',
+        'san andrés y providencia': 'SAP',
+        'tolima': 'TOL', 'valle del cauca': 'VAC',
+        'vaupés': 'VAU', 'vichada': 'VID'
+    };
 
     var periodLabels = {
         7: { singular: 'semana', plural: 'semanas', day: 7 },
@@ -126,18 +149,27 @@
         })
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
+            console.log('[Analytics] fetched data keys:', Object.keys(data || {}));
             if (!data) return;
             renderStats(data.summary);
             renderMap(data.leads_by_region || []);
-            renderRegionTable(data.leads_by_region || []);
+            renderRegionTable(data.leads_geocoded || []);
             renderFunnelChart(data.funnel || []);
             renderSourceMixChart(data.leads_by_source_monthly || []);
+
+            leadsByStage = data.leads_by_stage || {};
+            pipelineStages = data.pipeline_stages || [];
+            renderPhaseSelector();
+
             renderTimeChart(
                 data.leads_by_day || [],
                 data.leads_by_stage_won || [],
                 data.leads_by_stage_lost || [],
-                data.quotes_sent || []
+                data.quotes_sent || [],
+                leadsByStage
             );
+            currentGeocodedData = data.leads_geocoded || [];
+            renderSVGMap(currentGeocodedData);
         })
         .catch(function(e) { console.error('Analytics error:', e); });
     }
@@ -165,13 +197,8 @@
     }
 
     function renderMap(regionData) {
-        var mapContainer = document.getElementById('colombia-map-container');
-        var mapSvg = document.getElementById('colombia-map');
-        var tooltip = document.getElementById('map-tooltip');
-
-        if (!mapSvg) return;
-
-        mapSvg.innerHTML = '';
+        var mapContainer = document.getElementById('colombia-svg-map');
+        if (!mapContainer) return;
 
         var deptCounts = {};
         regionData.forEach(function(r) {
@@ -191,6 +218,16 @@
             if (ratio < 0.66) return '#60a5fa';
             return '#003366';
         };
+
+        var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '30 100 380 400');
+        svg.setAttribute('class', 'col-map-svg');
+
+        var tooltip = document.createElement('div');
+        tooltip.style.cssText = 'position:absolute;background:#fff;border:1px solid #e2e6ed;border-radius:8px;padding:8px 12px;font-size:12px;color:#1a1d24;pointer-events:none;display:none;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+        tooltip.style.position = 'absolute';
+        mapContainer.style.position = 'relative';
+        mapContainer.appendChild(tooltip);
 
         var deptPaths = [
             { id: 'ANTIOQUIA', d: 'M180,200 L220,180 L260,190 L280,230 L270,280 L240,310 L200,300 L170,260 Z', dept: 'Antioquia' },
@@ -254,11 +291,12 @@
                 path.style.opacity = '0.5';
             }
 
+            var capturedInfo = regionInfo;
             path.addEventListener('mouseenter', function(e) {
                 var name = pathInfo.dept;
-                var total = regionInfo ? regionInfo.total : 0;
-                var won = regionInfo ? regionInfo.won : 0;
-                var conv = regionInfo ? regionInfo.conversion_rate : 0;
+                var total = capturedInfo ? capturedInfo.total : 0;
+                var won = capturedInfo ? capturedInfo.won : 0;
+                var conv = capturedInfo ? capturedInfo.conversion_rate : 0;
                 tooltip.innerHTML = '<strong>' + name + '</strong><br>Leads: ' + total + '<br>Ganados: ' + won + '<br>Conversion: ' + conv + '%';
                 tooltip.style.display = 'block';
                 tooltip.style.opacity = '1';
@@ -276,11 +314,13 @@
             path.addEventListener('mouseleave', function() {
                 tooltip.style.display = 'none';
                 tooltip.style.opacity = '0';
-                path.style.opacity = regionInfo ? '1' : '0.5';
+                path.style.opacity = capturedInfo ? '1' : '0.5';
             });
 
-            mapSvg.appendChild(path);
+            svg.appendChild(path);
         });
+
+        mapContainer.appendChild(svg);
 
         var legendDiv = document.createElement('div');
         legendDiv.className = 'map-legend';
@@ -293,30 +333,170 @@
         mapContainer.appendChild(legendDiv);
     }
 
-    function renderRegionTable(regionData) {
+    function renderRegionTable(geocodedData) {
         var tbody = document.getElementById('region-table-body');
         if (!tbody) return;
 
-        if (!regionData || regionData.length === 0) {
+        if (!geocodedData || geocodedData.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Sin datos disponibles</td></tr>';
             return;
         }
 
+        var metric = currentMapMetric;
         var html = '';
-        regionData.forEach(function(r) {
-            var convPct = r.conversion_rate || 0;
-            var barColor = convPct > 15 ? '#2ec27e' : convPct > 5 ? '#f5a623' : '#ef4444';
-            var barWidth = Math.min(convPct, 100);
+        geocodedData.forEach(function(r) {
+            var total = r.total || 0;
+            var won = r.won || 0;
+            var lost = r.lost || 0;
+            var conversion = total > 0 ? Math.round((won / total) * 100) : 0;
+            var intensity = r.intensidad || 0;
+            var intensityWon = r.intensidad_won || 0;
+            var conversionNorm = conversion / 100;
+            var mapIntensity = getMapIntensity(r, metric);
+            var barColor = getMapColor(mapIntensity);
+            var barWidth = Math.round(mapIntensity * 100);
 
             html += '<tr>' +
-                '<td><strong>' + r.department + '</strong></td>' +
-                '<td class="text-center">' + r.total + '</td>' +
-                '<td class="text-center text-success fw-bold">' + r.won + '</td>' +
-                '<td class="text-center"><span class="badge" style="background:' + barColor + ';color:#fff">' + convPct + '%</span></td>' +
-                '<td><div class="conv-bar"><div class="conv-bar-fill" style="width:' + barWidth + '%;background:' + barColor + '"></div></div></td>' +
+                '<td><strong>' + (r.departamento || r.ciudad || '—') + '</strong></td>' +
+                '<td class="text-center fw-bold">' + total + '</td>' +
+                '<td class="text-center" style="color:' + (won > 0 ? '#22c55e' : '#94a3b8') + '">' + won + '</td>' +
+                '<td class="text-center" style="color:' + (lost > 0 ? '#ef4444' : '#94a3b8') + '">' + lost + '</td>' +
+                '<td>' +
+                    '<div class="d-flex align-items-center gap-2">' +
+                        '<span class="badge" style="background:' + barColor + ';color:#fff;font-size:10px">' + conversion + '%</span>' +
+                        '<div class="conv-bar" style="flex:1"><div class="conv-bar-fill" style="width:' + barWidth + '%;background:' + barColor + '"></div></div>' +
+                    '</div>' +
+                '</td>' +
                 '</tr>';
         });
         tbody.innerHTML = html;
+    }
+
+function renderSVGMap(geocodedData) {
+        var container = document.getElementById('colombia-svg-map');
+        console.log('[SVGMap] container:', container, 'data:', (geocodedData || []).length);
+        if (!container) return;
+
+        fetch('/static/crm/img/colombia.svg')
+            .then(function(r) { return r.text(); })
+            .then(function(svgText) {
+                container.innerHTML = svgText;
+                var svg = container.querySelector('svg');
+                if (!svg) return;
+
+                var dataMap = {};
+                if (geocodedData && geocodedData.length > 0) {
+                    geocodedData.forEach(function(d) {
+                        var rawName = (d.departamento || d.ciudad || '').trim().toLowerCase();
+                        var svgId = deptNameToSVGId[rawName];
+                        if (svgId) {
+                            var conversionRate = d.total > 0 ? Math.round((d.won / d.total) * 100) : 0;
+                            dataMap[svgId.toLowerCase()] = {
+                                total: d.total,
+                                won: d.won || 0,
+                                lost: d.lost || 0,
+                                conversion: conversionRate,
+                                intensidad: d.intensidad || 0,
+                                intensidad_won: d.intensidad_won || 0,
+                                label: d.departamento || d.ciudad
+                            };
+                        }
+                    });
+                }
+
+                var paths = svg.querySelectorAll('path');
+                paths.forEach(function(path) {
+                    var rawId = (path.getAttribute('id') || '').replace('CO-', '').trim().toLowerCase();
+                    var data = dataMap[rawId];
+
+                    var newPath = path.cloneNode(true);
+                    path.parentNode.replaceChild(newPath, path);
+
+                    if (data) {
+                        var intensity = getMapIntensity(data, currentMapMetric);
+                        var color = getMapColor(intensity);
+
+                        newPath.style.fill = color;
+
+                        newPath.addEventListener('mouseenter', function(e) {
+                            var metric = currentMapMetric;
+                            var val = getMapValue(data, metric);
+                            var suffix = metric === 'conversion' ? '%' : '';
+                            var won = data.won || 0;
+                            var lost = data.lost || 0;
+                            var total = data.total || 0;
+                            var convPct = total > 0 ? Math.round((won / total) * 100) : 0;
+                            var statusNote = '';
+                            if (total > 0 && won === 0 && lost === 0) statusNote = ' (en curso)';
+                            else if (total > 0 && won === 0 && lost > 0) statusNote = ' (sin conversion)';
+                            showMapTooltip(e,
+                                data.label + '\n' +
+                                'Leads: ' + total + ' | Ganados: ' + won + ' | Perdidos: ' + lost + '\n' +
+                                'Conversion: ' + convPct + '%' + statusNote
+                            );
+                        });
+                        newPath.addEventListener('mousemove', moveMapTooltip);
+                        newPath.addEventListener('mouseleave', hideMapTooltip);
+                    } else {
+                        newPath.style.fill = 'var(--color-muted)';
+                    }
+                });
+
+                console.log('[SVG Map] rendered ' + geocodedData.length + ' departments');
+            })
+            .catch(function(e) { console.error('[SVG Map] failed to load:', e); });
+    }
+
+    function getMapIntensity(data, metric) {
+        if (metric === 'won') return data.intensidad_won || 0;
+        if (metric === 'conversion') return (data.conversion || 0) / 100;
+        return data.intensidad || 0;
+    }
+
+    function getMapValue(data, metric) {
+        if (metric === 'won') return data.won || 0;
+        if (metric === 'conversion') return data.conversion || 0;
+        return data.total || 0;
+    }
+
+    function getMapColor(intensity) {
+        if (intensity === 0) return 'var(--color-muted)';
+        if (intensity > 0.8) return 'var(--color-heat-5)';
+        if (intensity > 0.6) return 'var(--color-heat-4)';
+        if (intensity > 0.4) return 'var(--color-heat-3)';
+        if (intensity > 0.2) return 'var(--color-heat-2)';
+        return 'var(--color-heat-1)';
+    }
+
+    function showMapTooltip(e, text) {
+        var tooltip = getOrCreateTooltip();
+        tooltip.textContent = text;
+        tooltip.style.display = 'block';
+        moveMapTooltip(e);
+    }
+
+    function hideMapTooltip() {
+        var tooltip = document.getElementById('map-tooltip');
+        if (tooltip) tooltip.style.display = 'none';
+    }
+
+    function moveMapTooltip(e) {
+        var tooltip = document.getElementById('map-tooltip');
+        if (tooltip && tooltip.style.display === 'block') {
+            tooltip.style.left = (e.pageX + 12) + 'px';
+            tooltip.style.top = (e.pageY + 12) + 'px';
+        }
+    }
+
+    function getOrCreateTooltip() {
+        var tooltip = document.getElementById('map-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'map-tooltip';
+            tooltip.className = 'map-tooltip';
+            document.body.appendChild(tooltip);
+        }
+        return tooltip;
     }
 
     function renderFunnelChart(funnelData) {
@@ -515,8 +695,9 @@
         });
     }
 
-    function renderTimeChart(dayData, wonData, lostData, quoteData) {
+    function renderTimeChart(dayData, wonData, lostData, quoteData, stageData) {
         var canvas = document.getElementById('timeline-chart');
+        console.log('[Timeline] canvas:', canvas, 'dayData length:', (dayData || []).length);
         if (!canvas) return;
 
         if (charts.timeline) {
@@ -590,56 +771,139 @@
         var ctx = canvas.getContext('2d');
         var colors = getColors();
 
+        var stageColors = {
+            'Leads nuevos': '#3b82f6',
+            'Cerrados Ganados': '#2ec27e',
+            'Cerrados Perdidos': '#ef4444',
+            'Cotizaciones Enviadas': '#f5a623',
+        };
+
+        var datasets = [
+            {
+                label: 'Leads nuevos',
+                data: newCounts,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 3,
+                pointBackgroundColor: '#3b82f6',
+                borderWidth: 2,
+            },
+            {
+                label: 'Cerrados Ganados',
+                data: wonCounts,
+                borderColor: '#2ec27e',
+                backgroundColor: 'transparent',
+                borderDash: [5, 5],
+                tension: 0.3,
+                pointRadius: 2,
+                pointBackgroundColor: '#2ec27e',
+                borderWidth: 2,
+            },
+            {
+                label: 'Cerrados Perdidos',
+                data: lostCounts,
+                borderColor: '#ef4444',
+                backgroundColor: 'transparent',
+                borderDash: [5, 5],
+                tension: 0.3,
+                pointRadius: 2,
+                pointBackgroundColor: '#ef4444',
+                borderWidth: 2,
+            },
+            {
+                label: 'Cotizaciones Enviadas',
+                data: quoteCounts,
+                borderColor: '#f5a623',
+                backgroundColor: 'transparent',
+                borderDash: [2, 2],
+                tension: 0.3,
+                pointRadius: 2,
+                pointBackgroundColor: '#f5a623',
+                borderWidth: 2,
+            }
+        ];
+
+        var stageObj;
+        var borderStyle;
+        var order;
+        var records;
+        var stageDataMap;
+        var stageCounts;
+        var parts;
+        var dateStr;
+        var monthIdx;
+        var year;
+        var colorIdx;
+        var hue;
+        var stageColor;
+
+        Object.keys(stageData || {}).forEach(function(stageName) {
+            if (stageName === 'Leads nuevos' || stageName === 'Cerrados Ganados' ||
+                stageName === 'Cerrados Perdidos' || stageName === 'Cotizaciones Enviadas') {
+                return;
+            }
+            colorIdx = Object.keys(stageColors).length + (Object.keys(stageColors).indexOf(stageName) % 8);
+            hue = (colorIdx * 45) % 360;
+            stageColor = 'hsl(' + hue + ', 65%, 55%)';
+            stageDataMap = {};
+            records = stageData[stageName] || [];
+            records.forEach(function(r) {
+                stageDataMap[r.date] = r.count;
+            });
+            stageCounts = keys.map(function(k) {
+                parts = k.split(' ');
+                if (parts.length === 2 && /^\d+$/.test(parts[0])) {
+                    monthIdx = months.indexOf(parts[1]);
+                    if (monthIdx >= 0) {
+                        year = new Date().getFullYear();
+                        dateStr = parts[0].padStart(2, '0') + '-' + String(monthIdx + 1).padStart(2, '0') + '-' + year;
+                    } else {
+                        dateStr = k;
+                    }
+                } else {
+                    dateStr = k;
+                }
+                return stageDataMap[dateStr] || 0;
+            });
+            stageObj = null;
+            borderStyle = [5, 5];
+            for (var si = 0; si < pipelineStages.length; si++) {
+                if (pipelineStages[si].name === stageName) {
+                    stageObj = pipelineStages[si];
+                    break;
+                }
+            }
+            if (stageObj) {
+                order = stageObj.order || 1;
+                if (order % 2 === 0) borderStyle = [2, 2];
+                else if (order % 3 === 0) borderStyle = [10, 5];
+            }
+            datasets.push({
+                label: stageName,
+                data: stageCounts,
+                borderColor: stageColor,
+                backgroundColor: 'transparent',
+                borderDash: borderStyle,
+                tension: 0.3,
+                pointRadius: 1.5,
+                pointBackgroundColor: stageColor,
+                borderWidth: 1.5,
+            });
+        });
+
+        timelineAllDatasets = datasets.slice();
+
+        var visibleDatasets = selectedPhases.size > 0
+            ? datasets.filter(function(ds) { return selectedPhases.has(ds.label); })
+            : datasets;
+
         charts.timeline = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: dayLabels,
-                datasets: [
-                    {
-                        label: 'Leads nuevos',
-                        data: newCounts,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                        fill: true,
-                        tension: 0.3,
-                        pointRadius: 3,
-                        pointBackgroundColor: '#3b82f6',
-                        borderWidth: 2,
-                    },
-                    {
-                        label: 'Cerrados Ganados',
-                        data: wonCounts,
-                        borderColor: '#2ec27e',
-                        backgroundColor: 'transparent',
-                        borderDash: [5, 5],
-                        tension: 0.3,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#2ec27e',
-                        borderWidth: 2,
-                    },
-                    {
-                        label: 'Cerrados Perdidos',
-                        data: lostCounts,
-                        borderColor: '#ef4444',
-                        backgroundColor: 'transparent',
-                        borderDash: [5, 5],
-                        tension: 0.3,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#ef4444',
-                        borderWidth: 2,
-                    },
-                    {
-                        label: 'Cotizaciones Enviadas',
-                        data: quoteCounts,
-                        borderColor: '#f5a623',
-                        backgroundColor: 'transparent',
-                        borderDash: [2, 2],
-                        tension: 0.3,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#f5a623',
-                        borderWidth: 2,
-                    }
-                ],
+                datasets: visibleDatasets,
             },
             options: {
                 responsive: true,
@@ -675,6 +939,77 @@
                 },
             },
         });
+}
+
+    function renderPhaseSelector() {
+        var container = document.getElementById('phase-selector');
+        if (!container) return;
+
+        selectedPhases = new Set();
+
+        var defaults = ['Leads nuevos', 'Cerrados Ganados', 'Cerrados Perdidos', 'Cotizaciones Enviadas'];
+
+        container.innerHTML = '';
+        pipelineStages.forEach(function(stage) {
+            var name = stage.name || stage;
+            var color = stage.color || '#6b7385';
+            var isDefault = defaults.some(function(d) {
+                return d.toLowerCase() === name.toLowerCase();
+            });
+
+            var pill = document.createElement('button');
+            pill.className = 'phase-pill' + (isDefault ? ' active' : '');
+            pill.style.borderColor = color;
+            pill.style.color = isDefault ? color : 'var(--color-text-secondary)';
+            if (isDefault) {
+                pill.style.background = color + '22';
+                selectedPhases.add(name);
+            }
+            pill.textContent = name;
+            pill.dataset.stage = name;
+            pill.dataset.color = color;
+            pill.addEventListener('click', function() {
+                togglePhase(pill, name);
+            });
+            container.appendChild(pill);
+        });
+    }
+
+    function togglePhase(pill, stageName) {
+        if (selectedPhases.has(stageName)) {
+            if (selectedPhases.size <= 1) return;
+            selectedPhases.delete(stageName);
+            pill.classList.remove('active');
+            pill.style.background = '';
+            pill.style.color = '';
+        } else {
+            selectedPhases.add(stageName);
+            pill.classList.add('active');
+            var color = pill.dataset.color;
+            pill.style.background = color + '22';
+            pill.style.color = color;
+        }
+        updateTimelineChart();
+    }
+
+    function updateTimelineChart() {
+        console.log('[updateTimelineChart] selectedPhases size:', selectedPhases.size, 'chart:', !!charts.timeline, 'allDatasets:', timelineAllDatasets.length);
+        if (!charts.timeline) {
+            console.log('[updateTimelineChart] no timeline chart to update');
+            return;
+        }
+        if (timelineAllDatasets.length === 0) {
+            console.log('[updateTimelineChart] no datasets stored');
+            return;
+        }
+
+        var newDatasets = selectedPhases.size > 0
+            ? timelineAllDatasets.filter(function(ds) { return selectedPhases.has(ds.label); })
+            : timelineAllDatasets.slice();
+
+        console.log('[updateTimelineChart] showing', newDatasets.length, 'datasets of', timelineAllDatasets.length);
+        charts.timeline.data.datasets = newDatasets;
+        charts.timeline.update();
     }
 
     function applyTheme() {
@@ -684,6 +1019,14 @@
             }
         });
         charts = {};
+        if (typeof heatLayer !== 'undefined' && heatLayer) {
+            heatMap.removeLayer(heatLayer);
+            heatLayer = null;
+        }
+        if (typeof heatLegend !== 'undefined' && heatLegend) {
+            heatMap.removeControl(heatLegend);
+            heatLegend = null;
+        }
         fetchAnalytics();
     }
 
@@ -717,6 +1060,14 @@
         });
     }
 
+    var metricSelect = document.getElementById('map-metric-select');
+    if (metricSelect) {
+        metricSelect.addEventListener('change', function() {
+            currentMapMetric = metricSelect.value;
+            if (currentGeocodedData) renderSVGMap(currentGeocodedData);
+        });
+    }
+
     window.addEventListener('theme-changed', function() {
         applyTheme();
     });
@@ -725,6 +1076,7 @@
         if (e.key === 'sama-crm-theme') {
             document.body.classList.toggle('theme-light', e.newValue === 'light');
             applyTheme();
+            if (currentGeocodedData) renderSVGMap(currentGeocodedData);
         }
     });
 

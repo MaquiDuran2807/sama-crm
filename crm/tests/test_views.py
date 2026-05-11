@@ -355,6 +355,116 @@ class CRMAPITestCase(TestCase):
         monthly_data = response.data["leads_by_source_monthly"]
         self.assertIsInstance(monthly_data, list)
 
+    def test_analytics_leads_geocoded(self):
+        """Verifica que leads_geocoded agrupe leads por departamento con coordenadas del CSV."""
+        dept = Department.objects.create(name="Cundinamarca")
+        city = City.objects.create(
+            department=dept, name="Bogotá", latitude=4.6097, longitude=-74.0817
+        )
+        contact = Contact.objects.create(
+            tenant=self.tenant, full_name="Test", phone_number="573009999999", city=city
+        )
+        for _ in range(5):
+            Lead.objects.create(tenant=self.tenant, contact=contact, current_stage="Lead")
+
+        dept2 = Department.objects.create(name="Antioquia")
+        city2 = City.objects.create(
+            department=dept2, name="Medellín", latitude=6.2442, longitude=-75.5812
+        )
+        contact2 = Contact.objects.create(
+            tenant=self.tenant, full_name="Test2", phone_number="573008888888", city=city2
+        )
+        for _ in range(3):
+            Lead.objects.create(tenant=self.tenant, contact=contact2, current_stage="Lead")
+
+        response = self.client.get("/api/crm/tenants/codensolar/analytics/?days=365")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("leads_geocoded", response.data)
+        geocoded = response.data["leads_geocoded"]
+        self.assertIsInstance(geocoded, list)
+        self.assertGreaterEqual(len(geocoded), 2)
+
+        geocoded_keys = [g.get("departamento", "") for g in geocoded]
+
+        bogota_entry = next((g for g in geocoded if "cundinamarca" in g.get("departamento", "").lower()), None)
+        self.assertIsNotNone(bogota_entry, f"No se encontró Cundinamarca en {geocoded_keys}")
+        self.assertEqual(bogota_entry["total"], 5)
+        self.assertIn("latitud", bogota_entry)
+        self.assertIn("longitud", bogota_entry)
+        self.assertIn("intensidad", bogota_entry)
+        self.assertEqual(bogota_entry["intensidad"], 1.0)
+
+        medellin_entry = next((g for g in geocoded if "antioquia" in g.get("departamento", "").lower()), None)
+        self.assertIsNotNone(medellin_entry, f"No se encontró Antioquia en {geocoded_keys}")
+        self.assertEqual(medellin_entry["total"], 3)
+        self.assertAlmostEqual(medellin_entry["intensidad"], 0.7, places=2)
+
+    def test_analytics_leads_geocoded_empty(self):
+        """Verifica que leads_geocoded devuelva lista vacia cuando no hay leads."""
+        response = self.client.get("/api/crm/tenants/codensolar/analytics/?days=365")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("leads_geocoded", response.data)
+        self.assertEqual(response.data["leads_geocoded"], [])
+
+    def test_analytics_leads_geocoded_sorted(self):
+        """Verifica que leads_geocoded este ordenado por total descendente."""
+        dept = Department.objects.create(name="Cundinamarca")
+        city = City.objects.create(
+            department=dept, name="Bogotá", latitude=4.6097, longitude=-74.0817
+        )
+        contact = Contact.objects.create(
+            tenant=self.tenant, full_name="Test", phone_number="573001111111", city=city
+        )
+        for _ in range(2):
+            Lead.objects.create(tenant=self.tenant, contact=contact, current_stage="Lead")
+
+        dept2 = Department.objects.create(name="Valle del Cauca")
+        city2 = City.objects.create(
+            department=dept2, name="Cali", latitude=3.4516, longitude=-76.5320
+        )
+        contact2 = Contact.objects.create(
+            tenant=self.tenant, full_name="Test2", phone_number="573002222222", city=city2
+        )
+        Lead.objects.create(tenant=self.tenant, contact=contact2, current_stage="Lead")
+
+        response = self.client.get("/api/crm/tenants/codensolar/analytics/?days=365")
+        geocoded = response.data["leads_geocoded"]
+        totals = [g["total"] for g in geocoded]
+        self.assertEqual(totals, sorted(totals, reverse=True))
+
+    def test_analytics_html_contains_svg_map(self):
+        """Verifica que analytics.html cargue el mapa SVG de Colombia."""
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/analytics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "colombia-svg-map")
+        self.assertNotContains(response, "leaflet")
+        self.assertNotContains(response, "leaflet-heat")
+
+    def test_analytics_html_no_old_svg_map(self):
+        """Verifica que el viejo SVG del mapa de Colombia ya no exista."""
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/analytics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotContains(response, 'id="colombia-map"')
+        self.assertNotContains(response, 'class="col-map-svg"')
+
+    def test_analytics_html_dept_table_headers(self):
+        """Verifica que la tabla regional use columnas de departamento."""
+        client = Client()
+        client.force_login(self.user)
+        response = client.get("/crm/codensolar/analytics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, "Departamento")
+        self.assertContains(response, "Leads")
+        self.assertContains(response, "Ganados")
+        self.assertContains(response, "Perdidos")
+        self.assertContains(response, "Conv.%")
+        self.assertNotContains(response, "Datos por ciudad")
+        self.assertNotContains(response, "Intensidad")
+
 
 class PipelineConfigViewTestCase(TestCase):
     """Pruebas para la vista de configuracion del pipeline."""

@@ -77,13 +77,24 @@
         </div>
     </div>
 
-    <!-- Row 1: Colombia Map + Regional Table -->
+    <!-- Row 1: Colombia SVG Map + Regional Table -->
     <div class="charts-grid-2 mb-4">
         <div class="chart-card">
-            <div class="chart-title">Leads por región</div>
-            <div class="map-container" id="colombia-map-container">
-                <svg id="colombia-map" viewBox="0 0 500 600" xmlns="http://www.w3.org/2000/svg" class="col-map-svg"></svg>
-                <div id="map-tooltip" class="map-tooltip"></div>
+            <div class="chart-title">Mapa de Colombia — Leads por departamento</div>
+            <div class="colombia-map-container" id="colombia-svg-map"></div>
+            <div class="map-legend" id="map-legend">
+                <span class="map-legend-title">Ver:</span>
+                <select id="map-metric-select" class="map-metric-select">
+                    <option value="total">Total Leads</option>
+                    <option value="won">Cerrados Ganados</option>
+                    <option value="conversion">Tasa Conversión</option>
+                </select>
+                <div class="map-legend-colors">
+                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-5)"></span> Alta</span>
+                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-3)"></span> Media</span>
+                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-1)"></span> Baja</span>
+                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-muted)"></span> Sin datos</span>
+                </div>
             </div>
         </div>
         <div class="chart-card">
@@ -95,12 +106,12 @@
                             <th>Departamento</th>
                             <th class="text-center">Leads</th>
                             <th class="text-center">Ganados</th>
-                            <th class="text-center">Tasa</th>
-                            <th style="width: 80px;">Conversión</th>
+                            <th class="text-center">Perdidos</th>
+                            <th class="text-center">Conv.%</th>
                         </tr>
                     </thead>
                     <tbody id="region-table-body">
-                        <tr><td colspan="5" class="text-center text-muted py-4">Sin datos disponibles</td></tr>
+                        <tr><td colspan="3" class="text-center text-muted py-4">Sin datos disponibles</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -127,6 +138,7 @@
     <!-- Row 3: Timeline (full width) -->
     <div class="chart-full">
         <div class="chart-title">Leads en el tiempo</div>
+        <div class="phase-selector" id="phase-selector"></div>
         <div class="chart-wrapper">
             <canvas id="timeline-chart"></canvas>
         </div>
@@ -136,5 +148,5 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="{% static 'crm/js/analytics.js' %}"></script>
+<script src="{% static 'crm/js/analytics.js' %}?v=20260512"></script>
 {% endblock %}

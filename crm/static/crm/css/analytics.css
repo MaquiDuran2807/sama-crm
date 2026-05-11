@@ -297,6 +297,37 @@
     .charts-grid-2 { grid-template-columns: 1fr; }
 }
 
+/* Phase selector pills for timeline */
+.phase-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.85rem;
+}
+
+.phase-pill {
+    padding: 0.3rem 0.85rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--color-card-border);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.phase-pill:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.phase-pill.active {
+    background: rgba(240, 101, 57, 0.15);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
 @media (max-width: 768px) {
     .analytics-page { padding: 1rem; }
     .filter-bar { flex-direction: column; align-items: stretch; }
