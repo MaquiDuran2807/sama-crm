@@ -1090,6 +1090,13 @@ def tags_list_create(request, tenant_slug):
         serializer = TagSerializer(tags, many=True)
         return Response(serializer.data)
 
+    tag_name = request.data.get("name", "").strip()
+    if Tag.objects.filter(tenant=tenant, name__iexact=tag_name).exists():
+        return Response(
+            {"name": ["Ya existe una etiqueta con este nombre para este tenant."]},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     serializer = TagSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save(tenant=tenant, is_predefined=False)

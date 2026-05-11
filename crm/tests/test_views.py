@@ -13,7 +13,7 @@ from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
 from tenants.domain.models import Tenant, PipelineConfig
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Department, City
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Department, City, Tag, LeadTag
 
 
 class CRMAPITestCase(TestCase):
@@ -512,3 +512,153 @@ class PipelineConfigViewTestCase(TestCase):
         client = Client()
         response = client.get("/crm/codensolar/config/")
         self.assertEqual(response.status_code, 302)
+
+
+class TagAPITestCase(TestCase):
+    """Pruebas para los endpoints de etiquetas (tags)."""
+
+    def setUp(self):
+        """Construye un tenant, contacto y lead minimo para las pruebas."""
+
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+        self.tenant = Tenant.objects.create(
+            name="Codensolar SAS", slug="codensolar", is_active=True
+        )
+        self.contact = Contact.objects.create(
+            tenant=self.tenant, full_name="Juan Pérez", phone_number="573001234567"
+        )
+        self.lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        self.tag = Tag.objects.create(
+            tenant=self.tenant, name="VIP", color="#ff0000", is_predefined=False
+        )
+        self.predefined_tag = Tag.objects.create(
+            tenant=self.tenant, name="Urgente", color="#ff6600", is_predefined=True
+        )
+
+    def test_list_tenant_tags(self):
+        """Valida que el listado de etiquetas devuelva todas las del tenant."""
+
+        response = self.client.get("/api/crm/tenants/codensolar/tags/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        tag_names = [t["name"] for t in response.data]
+        self.assertIn("VIP", tag_names)
+        self.assertIn("Urgente", tag_names)
+
+    def test_create_tag(self):
+        """Valida la creacion de una etiqueta custom."""
+
+        response = self.client.post(
+            "/api/crm/tenants/codensolar/tags/",
+            {"name": "Nuevo Lead", "color": "#3498db"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["name"], "Nuevo Lead")
+        self.assertEqual(response.data["color"], "#3498db")
+        self.assertFalse(response.data["is_predefined"])
+
+    def test_create_duplicate_tag(self):
+        """Valida que no se pueda crear una etiqueta con nombre duplicado."""
+
+        response = self.client.post(
+            "/api/crm/tenants/codensolar/tags/",
+            {"name": "VIP", "color": "#000000"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delete_tag(self):
+        """Valida que se pueda eliminar una etiqueta custom."""
+
+        response = self.client.delete("/api/crm/tenants/codensolar/tags/1/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Tag.objects.filter(pk=1).exists())
+
+    def test_delete_predefined_tag_returns_403(self):
+        """Valida que no se pueda eliminar una etiqueta predefinida."""
+
+        response = self.client.delete("/api/crm/tenants/codensolar/tags/2/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Tag.objects.filter(pk=2).exists())
+
+    def test_add_tag_to_lead(self):
+        """Valida que se pueda asignar una etiqueta a un lead."""
+
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/add_tag/?tenant_slug=codensolar",
+            {"tag_id": self.tag.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(LeadTag.objects.filter(lead=self.lead, tag=self.tag).exists())
+
+    def test_add_tag_idempotent(self):
+        """Valida que agregar una etiqueta ya asignada devuelva 200."""
+
+        LeadTag.objects.create(lead=self.lead, tag=self.tag)
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/add_tag/?tenant_slug=codensolar",
+            {"tag_id": self.tag.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_add_tag_missing_id(self):
+        """Valida que add_tag devuelva 400 si no se proporciona tag_id."""
+
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/add_tag/?tenant_slug=codensolar",
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_remove_tag_from_lead(self):
+        """Valida que se pueda quitar una etiqueta de un lead."""
+
+        LeadTag.objects.create(lead=self.lead, tag=self.tag)
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/remove_tag/?tenant_slug=codensolar",
+            {"tag_id": self.tag.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(LeadTag.objects.filter(lead=self.lead, tag=self.tag).exists())
+
+    def test_remove_tag_not_assigned_returns_404(self):
+        """Valida que quitar una etiqueta no asignada devuelva 404."""
+
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/remove_tag/?tenant_slug=codensolar",
+            {"tag_id": self.tag.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_lead_serializer_includes_tags(self):
+        """Valida que el serializador de lead incluya las etiquetas."""
+
+        LeadTag.objects.create(lead=self.lead, tag=self.tag)
+        response = self.client.get(f"/api/crm/leads/{self.lead.id}/?tenant_slug=codensolar")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("tags", response.data)
+        self.assertEqual(len(response.data["tags"]), 1)
+        self.assertEqual(response.data["tags"][0]["name"], "VIP")
+        self.assertEqual(response.data["tags"][0]["color"], "#ff0000")
+
+    def test_lead_list_serializer_includes_tags(self):
+        """Valida que el serializer de listado incluya las etiquetas."""
+
+        LeadTag.objects.create(lead=self.lead, tag=self.tag)
+        response = self.client.get("/api/crm/leads/?tenant_slug=codensolar")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("tags", response.data[0])
+        self.assertEqual(len(response.data[0]["tags"]), 1)
