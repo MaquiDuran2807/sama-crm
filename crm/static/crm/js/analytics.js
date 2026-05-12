@@ -1041,6 +1041,7 @@
     if (sourceSelect) {
         sourceSelect.addEventListener('change', function() {
             currentSource = sourceSelect.value;
+            console.log('[SourceFilter] changed to:', currentSource, '| calling fetchAnalytics');
             fetchAnalytics();
         });
     }

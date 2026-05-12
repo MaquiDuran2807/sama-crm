@@ -30,6 +30,7 @@ from django.utils import timezone
 from tenants.domain.models import Tenant
 from tenants.domain.services import get_pipeline_stages
 from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, Tag, LeadTag, LeadTask
+from django.db.models.functions import TruncDate
 from crm.domain.services import change_lead_stage, get_leads_stats, get_lead_summary
 from crm.domain.contact_sync import sync_contact_from_whatsapp
 from crm.interfaces.serializers import (
@@ -871,7 +872,7 @@ def analytics_api(request, tenant_slug: str):
 
     # ── Leads by day ──
     date_counts = (
-        leads_qs.extra(select={"day": "DATE(created_at)"})
+        leads_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
@@ -911,7 +912,7 @@ def analytics_api(request, tenant_slug: str):
     if source_filter:
         won_qs = won_qs.filter(source__platform=source_filter)
     won_date_counts = (
-        won_qs.extra(select={"day": "DATE(created_at)"})
+        won_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
@@ -932,7 +933,7 @@ def analytics_api(request, tenant_slug: str):
     if source_filter:
         lost_qs = lost_qs.filter(source__platform=source_filter)
     lost_date_counts = (
-        lost_qs.extra(select={"day": "DATE(created_at)"})
+        lost_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
@@ -952,7 +953,7 @@ def analytics_api(request, tenant_slug: str):
     if source_filter:
         quotes_qs = quotes_qs.filter(source__platform=source_filter)
     quotes_date_counts = (
-        quotes_qs.extra(select={"day": "DATE(created_at)"})
+        quotes_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
@@ -1060,7 +1061,7 @@ def analytics_api(request, tenant_slug: str):
 
     # ── Stage counts by date (all phases) ──
     stage_date_counts = (
-        leads_qs.extra(select={"day": "DATE(created_at)"})
+        leads_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day", "current_stage")
         .annotate(count=Count("id"))
         .order_by("day")
