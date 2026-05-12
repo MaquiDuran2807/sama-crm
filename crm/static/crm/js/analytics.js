@@ -12,6 +12,8 @@
     var leadsByStage = {};
     var pipelineStages = [];
     var selectedPhases = new Set();
+    var currentKpiTargets = [];
+    var currentPeriodLabel = '';
 
     var deptNameToSVGId = {
         'amazonas': 'AMA', 'antioquia': 'ANT', 'arauca': 'ARA', 'atlantico': 'ATL',
@@ -134,14 +136,14 @@
         .then(function(data) {
             if (!data) return;
 
-            renderStats(data.summary);
-            renderMap(data.leads_by_region || []);
-            renderRegionTable(data.leads_geocoded || []);
-            renderFunnelChart(data.funnel || []);
-            renderSourceMixChart(data.leads_by_source_monthly || []);
+renderStats(data.summary);
+            renderGoalCards(data.kpi_targets || [], data.current_period_label || '');
+            renderFunnelChart(data.funnel || [], data.kpi_targets || []);
 
             leadsByStage = data.leads_by_stage || {};
             pipelineStages = data.pipeline_stages || [];
+            currentKpiTargets = data.kpi_targets || [];
+            currentPeriodLabel = data.current_period_label || '';
 
             var previousSelection = {};
             selectedPhases.forEach(function(v) { previousSelection[v] = true; });
@@ -161,8 +163,10 @@
                 data.leads_by_stage_lost || [],
                 data.quotes_sent || [],
                 leadsByStage,
-                stageNames
+                stageNames,
+                data.kpi_targets || []
             );
+            console.log('[fetchAnalytics] renderTimeChart called with total_leads_by_day count:', (data.total_leads_by_day || []).length);
             currentGeocodedData = data.leads_geocoded || [];
             renderSVGMap(currentGeocodedData);
             updateNavButtons();
@@ -485,7 +489,7 @@
         return tooltip;
     }
 
-    function renderFunnelChart(funnelData) {
+    function renderFunnelChart(funnelData, kpiTargets) {
         var canvas = document.getElementById('funnel-chart');
         if (!canvas) return;
 
@@ -498,9 +502,17 @@
 
         var totalLeads = funnelData.reduce(function(s, f) { return s + f.count; }, 0);
         var summaryEl = document.getElementById('funnel-summary');
-        if (summaryEl) {
-            summaryEl.innerHTML = '<span class="funnel-total">' + totalLeads + ' leads totales</span>';
+
+        var convTarget = null;
+        (kpiTargets || []).forEach(function(t) {
+            if (t.metric_type === 'conversions') convTarget = t;
+        });
+
+        var summaryHtml = '<span class="funnel-total">' + totalLeads + ' leads totales</span>';
+        if (convTarget) {
+            summaryHtml += ' <span style="color:var(--color-primary);font-weight:700">| Meta: ' + convTarget.target_value + '</span>';
         }
+        if (summaryEl) summaryEl.innerHTML = summaryHtml;
 
         var samaGradient = [
             '#003366', '#004080', '#1959A8', '#4078C0',
@@ -552,7 +564,8 @@
                         formatter: function(value, ctx) {
                             var total = ctx.dataset.data.reduce(function(a, b) { return a + b; }, 0);
                             var pct = total > 0 ? Math.round((value / total) * 100) : 0;
-                            return value + ' (' + pct + '%)';
+                            var label = value + ' (' + pct + '%)';
+                            return label;
                         },
                     },
                 },
@@ -569,6 +582,36 @@
                 },
             },
         });
+
+        if (convTarget && convTarget.target_value > 0) {
+            var chart = charts.funnel;
+            var maxCount = Math.max.apply(null, counts) || 1;
+            var targetX = Math.min(convTarget.target_value, maxCount * 1.2);
+            var scaleFactor = chart.chartArea ? (chart.chartArea.right - chart.chartArea.left) / maxCount : 1;
+            var targetXPos = (convTarget.target_value / maxCount) * scaleFactor + (chart.chartArea ? chart.chartArea.left : 0);
+
+            var existingOverlay = document.getElementById('funnel-goal-overlay');
+            if (existingOverlay) existingOverlay.remove();
+
+            var overlay = document.createElement('div');
+            overlay.id = 'funnel-goal-overlay';
+            overlay.style.cssText = '' +
+                'position:absolute;' +
+                'right:' + (canvas.parentElement ? (canvas.parentElement.offsetWidth - canvas.offsetWidth - 4) : 4) + 'px;' +
+                'top:' + (canvas.offsetTop + (funnelData.length > 0 ? (funnelData.length - 0.5) / funnelData.length * canvas.offsetHeight : 0)) + 'px;' +
+                'background:var(--color-primary);' +
+                'color:#fff;' +
+                'font-size:0.65rem;' +
+                'font-weight:700;' +
+                'padding:0.1rem 0.35rem;' +
+                'border-radius:4px;' +
+                'white-space:nowrap;' +
+                'z-index:5;' +
+                'pointer-events:none;';
+            overlay.textContent = 'Meta: ' + convTarget.target_value;
+            if (canvas.parentElement) canvas.parentElement.style.position = 'relative';
+            canvas.parentElement.appendChild(overlay);
+        }
     }
 
     function renderSourceMixChart(sourceMonthlyData) {
@@ -775,10 +818,10 @@
         return map;
     }
 
-    function renderTimeChart(dayData, wonData, lostData, quoteData, stageData, stageNames) {
+    function renderTimeChart(dayData, wonData, lostData, quoteData, stageData, stageNames, kpiTargets) {
         var canvas = document.getElementById('timeline-chart');
+        console.log('[renderTimeChart] canvas:', !!canvas, 'size:', canvas ? canvas.width + 'x' + canvas.height : 'n/a');
         if (!canvas) return;
-
         if (charts.timeline) {
             charts.timeline.destroy();
             delete charts.timeline;
@@ -890,8 +933,13 @@
         timelineAllDatasets = datasets.slice();
 
         var visibleDatasets = selectedPhases.size > 0
-            ? datasets.filter(function(ds) { return selectedPhases.has(ds.label); })
+            ? datasets.filter(function(ds) {
+                if (ds.label === 'Leads nuevos') return true;
+                return selectedPhases.has(ds.label);
+              })
             : datasets;
+        console.log('[renderTimeChart] visibleDatasets:', visibleDatasets.length, '| first data:', visibleDatasets.length > 0 ? visibleDatasets[0].data.slice(0,5) : 'none');
+        console.log('[renderTimeChart] dayLabels:', dayLabels.slice(0,5));
 
         charts.timeline = new Chart(ctx, {
             type: 'line',
@@ -914,6 +962,9 @@
                         },
                     },
                     datalabels: { display: false },
+                    annotation: {
+                        annotations: buildAnnotations(dayLabels, kpiTargets),
+                    },
                 },
                 scales: {
                     x: {
@@ -936,6 +987,86 @@
                     },
                 },
             },
+        });
+    }
+
+    function buildAnnotations(labels, kpiTargets) {
+        var ann = {};
+        var leadTarget = null;
+        (kpiTargets || []).forEach(function(t) {
+            if (t.metric_type === 'leads') leadTarget = t;
+        });
+        if (leadTarget && leadTarget.target_value > 0) {
+            ann.leadGoal = {
+                type: 'line',
+                yMin: leadTarget.target_value,
+                yMax: leadTarget.target_value,
+                borderColor: '#10b981',
+                borderWidth: 1.5,
+                borderDash: [6, 4],
+                label: {
+                    content: 'Meta: ' + leadTarget.target_value + ' leads',
+                    enabled: true,
+                    position: 'end',
+                    backgroundColor: 'rgba(16,185,129,0.12)',
+                    color: '#10b981',
+                    font: { size: 11, weight: 'bold' },
+                    padding: { x: 6, y: 3 },
+                },
+            };
+        }
+        return ann;
+    }
+
+    function renderGoalCards(kpiTargets, periodLabel) {
+        var emptyEl = document.getElementById('goal-no-targets');
+        var listEl = document.getElementById('goal-cards-list');
+        if (!emptyEl || !listEl) return;
+
+        if (!kpiTargets || kpiTargets.length === 0) {
+            emptyEl.style.display = 'flex';
+            listEl.style.display = 'none';
+            return;
+        }
+
+        emptyEl.style.display = 'none';
+        listEl.style.display = 'grid';
+
+        listEl.innerHTML = '';
+
+        kpiTargets.forEach(function(target) {
+            var pct = target.progress_percent || 0;
+            var status = pct >= 80 ? 'on-track' : (pct >= 50 ? 'at-risk' : 'behind');
+            var isRate = target.metric_type === 'conversion_rate';
+
+            var displayCurrent = isRate ? (target.current_value || 0) + '%' : Math.round(target.current_value || 0);
+            var displayTarget = isRate ? (target.target_value || 0) + '%' : Math.round(target.target_value || 0);
+
+            var metricLabel = '';
+            if (target.metric_type === 'leads') metricLabel = 'Leads';
+            else if (target.metric_type === 'conversions') metricLabel = 'Conversiones';
+            else if (target.metric_type === 'conversion_rate') metricLabel = 'Tasa conversion';
+            else if (target.metric_type === 'avg_days') metricLabel = 'Dias promedio cierre';
+
+            var card = document.createElement('div');
+            card.className = 'goal-card ' + status;
+            card.innerHTML =
+                '<div class="goal-card-header">' +
+                    '<span class="goal-name">' + (target.name || metricLabel) + '</span>' +
+                    '<span class="goal-period">' + (periodLabel || 'Mes') + '</span>' +
+                '</div>' +
+                '<div class="goal-numbers">' +
+                    '<span class="goal-current">' + displayCurrent + '</span>' +
+                    '<span class="goal-separator">/</span>' +
+                    '<span class="goal-target">' + displayTarget + '</span>' +
+                '</div>' +
+                '<div class="goal-progress-container">' +
+                    '<div class="goal-progress-bar-track">' +
+                        '<div class="goal-progress-bar-fill" style="width:' + Math.min(pct, 100) + '%"></div>' +
+                    '</div>' +
+                    '<span class="goal-percent">' + Math.round(pct) + '%</span>' +
+                '</div>';
+            listEl.appendChild(card);
         });
     }
 
@@ -990,7 +1121,10 @@
         if (timelineAllDatasets.length === 0) return;
 
         var newDatasets = selectedPhases.size > 0
-            ? timelineAllDatasets.filter(function(ds) { return selectedPhases.has(ds.label); })
+            ? timelineAllDatasets.filter(function(ds) {
+                if (ds.label === 'Leads nuevos') return true;
+                return selectedPhases.has(ds.label);
+              })
             : timelineAllDatasets.slice();
 
         charts.timeline.data.datasets = newDatasets;

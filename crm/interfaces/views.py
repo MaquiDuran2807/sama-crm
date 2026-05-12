@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from django.db import models
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, Q, Prefetch
 from django.db.models.functions import TruncMonth
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
@@ -28,8 +28,9 @@ from django.views import View
 from django.utils import timezone
 
 from tenants.domain.models import Tenant
+from crm.interfaces.permissions import TenantAccessMixin
 from tenants.domain.services import get_pipeline_stages
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, Tag, LeadTag, LeadTask
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, Tag, LeadTag, LeadTask, KpiTarget
 from django.db.models.functions import TruncDate
 from crm.domain.services import change_lead_stage, get_leads_stats, get_lead_summary
 from crm.domain.contact_sync import sync_contact_from_whatsapp
@@ -38,6 +39,7 @@ from crm.interfaces.serializers import (
     LeadSerializer,
     LeadDetailSerializer,
     LeadCreateSerializer,
+    LeadSourceSerializer,
     LeadSummarySerializer,
     LeadsStatsSerializer,
     TagSerializer,
@@ -78,7 +80,7 @@ def webhook_sync_contact(request):
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class ContactViewSet(viewsets.ModelViewSet):
+class ContactViewSet(TenantAccessMixin, viewsets.ModelViewSet):
     """ViewSet CRUD para contactos asociados a un tenant.
 
     El `tenant_slug` se espera en la query string porque la API opera sobre un
@@ -90,21 +92,16 @@ class ContactViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Construye el queryset restringido al tenant indicado por query param."""
-
-        tenant_slug = self.request.query_params.get("tenant_slug")
-        if not tenant_slug:
-            return Contact.objects.none()
-        return Contact.objects.filter(tenant__slug=tenant_slug, tenant__is_active=True)
+        tenant = self.get_tenant_from_request()
+        return Contact.objects.filter(tenant=tenant).select_related("tenant", "referrer_contact")
 
     def perform_create(self, serializer):
         """Persiste un contacto asociandolo al tenant resuelto por slug."""
-
-        tenant_slug = self.request.query_params.get("tenant_slug")
-        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        tenant = self.get_tenant_from_request()
         serializer.save(tenant=tenant)
 
 
-class LeadViewSet(viewsets.ModelViewSet):
+class LeadViewSet(TenantAccessMixin, viewsets.ModelViewSet):
     """ViewSet CRUD para leads del tenant activo en la peticion."""
     permission_classes = [IsAuthenticated]
 
@@ -120,11 +117,11 @@ class LeadViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Devuelve los leads activos del tenant filtrando por etapa o contacto."""
 
-        tenant_slug = self.request.query_params.get("tenant_slug")
-        if not tenant_slug:
-            return Lead.objects.none()
+        tenant = self.get_tenant_from_request()
 
-        qs = Lead.objects.filter(tenant__slug=tenant_slug, tenant__is_active=True)
+        qs = Lead.objects.filter(tenant=tenant, is_deleted=False)
+        # Prefetch relaciones de uso frecuente para evitar N+1 en serializacion
+        qs = qs.select_related("contact", "tenant").prefetch_related("tasks", "lead_tags__tag")
 
         stage = self.request.query_params.get("stage")
         if stage:
@@ -152,7 +149,7 @@ class LeadViewSet(viewsets.ModelViewSet):
         if tag_id:
             qs = qs.filter(lead_tags__tag_id=tag_id).distinct()
 
-        return qs.select_related("contact", "tenant")
+        return qs
 
     def _username(self):
         """Retorna el nombre de usuario actual o 'admin' como fallback."""
@@ -160,20 +157,26 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Crea un lead y, si corresponde, su fuente de origen asociada."""
-        tenant_slug = self.request.query_params.get("tenant_slug")
-        tenant = get_object_or_404(Tenant, slug=tenant_slug, is_active=True)
+        tenant = self.get_tenant_from_request()
         lead = serializer.save(tenant=tenant)
 
-        utm_source = self.request.data.get("utm_source")
-        if utm_source:
-            LeadSource.objects.create(
-                lead=lead,
-                platform=self.request.data.get("platform", "web"),
-                utm_source=utm_source,
-                utm_medium=self.request.data.get("utm_medium", ""),
-                utm_campaign=self.request.data.get("utm_campaign", ""),
-                landing_page_url=self.request.data.get("landing_page_url", ""),
-            )
+        # Validar y crear LeadSource mediante serializer para evitar datos sucios
+        utm_payload = {
+            "platform": self.request.data.get("platform", "web"),
+            "utm_source": self.request.data.get("utm_source", ""),
+            "utm_medium": self.request.data.get("utm_medium", ""),
+            "utm_campaign": self.request.data.get("utm_campaign", ""),
+            "landing_page_url": self.request.data.get("landing_page_url", ""),
+            "referrer_contact": self.request.data.get("referrer_contact", None),
+        }
+        utm_serializer = LeadSourceSerializer(data=utm_payload)
+        if utm_serializer.is_valid():
+            utm_serializer.save(lead=lead)
+        elif any(utm_payload.values()):
+            # Si se envió algun campo UTM pero no es valido, devolver error 400
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(utm_serializer.errors)
         LeadActivity.objects.create(
             lead=lead,
             activity_type="created",
@@ -1099,6 +1102,52 @@ def analytics_api(request, tenant_slug: str):
         for stage in pipeline_stages
     }
 
+    # ── KPI Targets ──
+    kpi_targets_data = []
+    active_targets = KpiTarget.objects.filter(tenant=tenant, is_active=True)
+
+    period_label_months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    now_local = timezone.now()
+    current_period_label = period_label_months[now_local.month - 1] + " " + str(now_local.year)
+
+    for target in active_targets:
+        current_value = 0.0
+        period_start = None
+
+        if target.period_type == KpiTarget.PeriodType.MONTHLY:
+            period_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif target.period_type == KpiTarget.PeriodType.WEEKLY:
+            days_since_monday = now_local.weekday()
+            period_start = (now_local - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+        elif target.period_type == KpiTarget.PeriodType.QUARTERLY:
+            quarter_month = (now_local.month - 1) // 3 * 3 + 1
+            period_start = now_local.replace(month=quarter_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif target.period_type == KpiTarget.PeriodType.DAILY:
+            period_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if period_start:
+            period_leads = Lead.objects.filter(tenant=tenant, is_deleted=False, created_at__gte=period_start)
+            if source_filter:
+                period_leads = period_leads.filter(source__platform=source_filter)
+
+            if target.metric_type == KpiTarget.MetricType.LEADS:
+                current_value = float(period_leads.count())
+            elif target.metric_type == KpiTarget.MetricType.CONVERSIONS:
+                current_value = float(period_leads.filter(is_closed=True, closed_result="won").count())
+            elif target.metric_type == KpiTarget.MetricType.CONVERSION_RATE:
+                total = period_leads.count()
+                won = period_leads.filter(is_closed=True, closed_result="won").count()
+                current_value = round((won / total) * 100, 1) if total > 0 else 0.0
+
+        progress_percent = round((current_value / target.target_value) * 100, 1) if target.target_value > 0 else 0.0
+        kpi_targets_data.append({
+            "name": target.name,
+            "metric_type": target.metric_type,
+            "target_value": target.target_value,
+            "current_value": current_value,
+            "progress_percent": progress_percent,
+        })
+
     return Response({
         "funnel": funnel,
         "leads_by_source": leads_by_source,
@@ -1121,6 +1170,8 @@ def analytics_api(request, tenant_slug: str):
             "avg_days_to_close": round(avg_days, 1),
             "leads_this_week": leads_this_week,
         },
+        "kpi_targets": kpi_targets_data,
+        "current_period_label": current_period_label,
     })
 
 

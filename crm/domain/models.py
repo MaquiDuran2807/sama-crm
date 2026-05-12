@@ -223,6 +223,37 @@ class Tag(models.Model):
         return f"{self.tenant.name} / {self.name}"
 
 
+class KpiTarget(models.Model):
+    """Meta de KPI para un tenant."""
+
+    class MetricType(models.TextChoices):
+        LEADS = "leads", "Leads totales"
+        CONVERSIONS = "conversions", "Conversiones (Cerrados Ganados)"
+        CONVERSION_RATE = "conversion_rate", "Tasa de conversión"
+        AVG_DAYS = "avg_days", "Días promedio de cierre"
+
+    class PeriodType(models.TextChoices):
+        DAILY = "daily", "Diario"
+        WEEKLY = "weekly", "Semanal"
+        MONTHLY = "monthly", "Mensual"
+        QUARTERLY = "quarterly", "Trimestral"
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="kpi_targets")
+    name = models.CharField(max_length=100, help_text="Nombre descriptivo, ej: 'Leads mensuales'")
+    metric_type = models.CharField(max_length=30, choices=MetricType.choices)
+    target_value = models.FloatField(help_text="Valor objetivo, ej: 100.0")
+    period_type = models.CharField(max_length=20, choices=PeriodType.choices, default=PeriodType.MONTHLY)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["metric_type", "period_type"]
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
+
+
 class LeadTag(models.Model):
     """Relacion many-to-many entre Lead y Tag."""
     lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="lead_tags")

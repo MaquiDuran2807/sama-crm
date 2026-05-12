@@ -7,16 +7,28 @@ actualizacion.
 """
 
 from rest_framework import serializers
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Tag, LeadTag
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Tag, LeadTag, KpiTarget
 from ingesta.models import DailyTextSummary
 
 
 class LeadSourceSerializer(serializers.ModelSerializer):
     """Serializa la fuente de origen de un lead."""
+    platform = serializers.ChoiceField(choices=["meta", "google", "tiktok", "web", "referral"], default="web")
+    utm_source = serializers.CharField(max_length=200, allow_blank=True, required=False)
+    utm_medium = serializers.CharField(max_length=200, allow_blank=True, required=False)
+    utm_campaign = serializers.CharField(max_length=200, allow_blank=True, required=False)
+    landing_page_url = serializers.URLField(allow_blank=True, required=False)
 
     class Meta:
         model = LeadSource
         fields = ["platform", "utm_source", "utm_medium", "utm_campaign", "referrer_contact", "landing_page_url"]
+
+    def validate(self, data):
+        # Trim strings
+        for k in ("utm_source", "utm_medium", "utm_campaign"):
+            if k in data and isinstance(data[k], str):
+                data[k] = data[k].strip()
+        return data
 
 
 class LeadActivitySerializer(serializers.ModelSerializer):
@@ -204,3 +216,15 @@ class TaskSerializer(serializers.ModelSerializer):
         model = LeadTask
         fields = ["id", "description", "due_date", "is_completed", "completed_at", "created_at"]
         read_only_fields = ["id", "completed_at", "created_at"]
+
+
+class KpiTargetSerializer(serializers.ModelSerializer):
+    """Serializer para metas KPI de un tenant."""
+
+    class Meta:
+        model = KpiTarget
+        fields = [
+            "id", "name", "metric_type", "target_value",
+            "period_type", "is_active", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]

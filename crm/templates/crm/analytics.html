@@ -77,6 +77,20 @@
         </div>
     </div>
 
+    <!-- Goal cards -->
+    <div id="goal-cards-container" class="goal-cards-summary">
+        <div class="goal-no-targets" id="goal-no-targets">
+            <div class="goal-empty-state">
+                <i class="bi bi-bullseye" style="font-size:2rem;color:var(--color-muted);display:block;margin-bottom:0.5rem"></i>
+                <p style="margin:0 0 0.5rem 0;font-size:0.95rem;color:var(--color-text-secondary)">No hay metas definidas para este período</p>
+                <a href="/crm/{{ tenant.slug }}/settings/kpis/" class="goal-config-link">
+                    <i class="bi bi-gear"></i> Configurar metas
+                </a>
+            </div>
+        </div>
+        <div id="goal-cards-list" class="goal-cards-list" style="display:none"></div>
+    </div>
+
     <!-- Row 1: Colombia SVG Map + Regional Table -->
     <div class="charts-grid-2 mb-4">
         <div class="chart-card">
@@ -148,5 +162,6 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="{% static 'crm/js/analytics.js' %}?v=20260521"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="{% static 'crm/js/analytics.js' %}?v=20260528"></script>
 {% endblock %}
