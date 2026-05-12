@@ -292,7 +292,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
     };
 
     function loadTasks() {
-        apiCall(apiBase + '/tasks' + apiQuery, 'GET', null)
+        apiCall(apiBase + '/tasks/' + apiQuery, 'GET', null)
             .then(function(tasks) {
                 renderModalTasks(tasks);
             })
@@ -352,7 +352,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
 
         console.log('Creating task with data:', JSON.stringify(data));
 
-        apiCall(apiBase + '/tasks' + apiQuery, 'POST', data)
+        apiCall(apiBase + '/tasks/' + apiQuery, 'POST', data)
             .then(function(response) {
                 console.log('Task created:', response);
                 if (descInput) descInput.value = '';
