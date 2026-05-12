@@ -331,7 +331,7 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         var descInput = document.getElementById('new-task-description');
         var dueInput = document.getElementById('new-task-due-date');
         var description = descInput ? descInput.value.trim() : '';
-        var due_date = dueInput ? dueInput.value : null;
+        var due_datetime = dueInput ? dueInput.value : null;
 
         if (!description) {
             alert('La descripción de la tarea es obligatoria.');
@@ -339,18 +339,31 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
         }
 
         var data = { description: description };
-        if (due_date) {
-            data.due_date = due_date;
+        if (due_datetime && due_datetime.trim() !== '') {
+            // Convertir de formato local a formato ISO
+            var dateObj = new Date(due_datetime);
+            if (!isNaN(dateObj.getTime())) {
+                // Formato ISO: YYYY-MM-DDTHH:MM:SS
+                var isoDate = dateObj.toISOString();
+                data.due_date = isoDate;
+                console.log('Sending due_date as:', isoDate);
+            }
         }
 
+        console.log('Creating task with data:', JSON.stringify(data));
+
         apiCall(apiBase + '/tasks' + apiQuery, 'POST', data)
-            .then(function() {
+            .then(function(response) {
+                console.log('Task created:', response);
                 if (descInput) descInput.value = '';
                 if (dueInput) dueInput.value = '';
                 loadTasks();
                 location.reload();
             })
-            .catch(function() {});
+            .catch(function(error) {
+                console.error('Error creating task:', error);
+                alert('Error al crear la tarea. Verifica los datos e intenta de nuevo.');
+            });
     };
 
     window.toggleTask = function(taskId) {
