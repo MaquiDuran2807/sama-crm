@@ -61,3 +61,55 @@ def permanently_delete_old_leads() -> dict[str, int]:
     count = deleted_leads.count()
     deleted_leads.delete()
     return {"permanently_deleted": count}
+
+
+@shared_task(name="crm.tasks.send_task_reminders")
+def send_task_reminders() -> str:
+    """Revisa todas las tareas pendientes y muestra recordatorios en consola.
+
+    Esta tarea busca tareas que:
+    - No están completadas (is_completed=False)
+    - Tienen fecha de vencimiento (due_date no es null)
+    - Vencen hoy, mañana, o ya están vencidas
+    - Pertenecen a leads no eliminados y no cerrados
+
+    En el futuro, esta tarea podría enviar notificaciones por WhatsApp
+    al tenant o al usuario asignado.
+
+    Returns:
+        Mensaje con la cantidad de recordatorios procesados.
+    """
+    from crm.domain.models import LeadTask
+
+    now = timezone.now()
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+
+    upcoming_tasks = LeadTask.objects.filter(
+        is_completed=False,
+        due_date__isnull=False,
+        due_date__lte=tomorrow,
+        lead__is_deleted=False,
+        lead__is_closed=False,
+    ).select_related("lead__contact", "lead__tenant")
+
+    count = 0
+    for task in upcoming_tasks:
+        lead = task.lead
+        days_until = (task.due_date - today).days if task.due_date else None
+        if days_until is not None and days_until < 0:
+            status = f"VENCIDA (hace {-days_until} días)"
+        elif days_until == 0:
+            status = "VENCE HOY"
+        elif days_until == 1:
+            status = "VENCE MAÑANA"
+        else:
+            status = f"Vence en {days_until} días"
+
+        print(
+            f"[TASK REMINDER] {lead.tenant.name} | Lead: {lead.contact.full_name} | "
+            f"Tarea: {task.description} | {status} | Due: {task.due_date}"
+        )
+        count += 1
+
+    return f"Se procesaron {count} recordatorios de tareas."

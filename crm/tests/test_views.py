@@ -662,3 +662,151 @@ class TagAPITestCase(TestCase):
         self.assertEqual(len(response.data), 1)
         self.assertIn("tags", response.data[0])
         self.assertEqual(len(response.data[0]["tags"]), 1)
+
+
+class TaskAPITestCase(TestCase):
+    """Pruebas para los endpoints de tareas (tasks)."""
+
+    def setUp(self):
+        """Construye un tenant, contacto y lead mínimo para las pruebas."""
+
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="testuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+        self.tenant = Tenant.objects.create(
+            name="Codensolar SAS", slug="codensolar", is_active=True
+        )
+        self.contact = Contact.objects.create(
+            tenant=self.tenant, full_name="Juan Pérez", phone_number="573001234567"
+        )
+        self.lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead"
+        )
+        from datetime import date, timedelta
+        self.today = date.today()
+        self.tomorrow = self.today + timedelta(days=1)
+        self.yesterday = self.today - timedelta(days=1)
+
+    def test_create_task(self):
+        """Valida la creación de una tarea."""
+
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/tasks/?tenant_slug=codensolar",
+            {"description": "Llamar al cliente", "due_date": str(self.today)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["description"], "Llamar al cliente")
+        self.assertIn(str(self.today), response.data["due_date"])
+        self.assertFalse(response.data["is_completed"])
+
+    def test_create_task_without_due_date(self):
+        """Valida la creación de una tarea sin fecha de vencimiento."""
+
+        response = self.client.post(
+            f"/api/crm/leads/{self.lead.id}/tasks/?tenant_slug=codensolar",
+            {"description": "Seguimiento sin fecha"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["due_date"])
+
+    def test_list_tasks(self):
+        """Valida que el listado de tareas funcione."""
+
+        LeadTask.objects.create(
+            lead=self.lead,
+            description="Tarea 1",
+            due_date=self.today
+        )
+        LeadTask.objects.create(
+            lead=self.lead,
+            description="Tarea 2",
+            due_date=self.tomorrow
+        )
+        response = self.client.get(
+            f"/api/crm/leads/{self.lead.id}/tasks/?tenant_slug=codensolar"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
+    def test_task_ordering_due_date(self):
+        """Valida que las tareas se ordenen por due_date asc (nulos al final)."""
+
+        LeadTask.objects.create(lead=self.lead, description="Con fecha", due_date=self.today)
+        LeadTask.objects.create(lead=self.lead, description="Sin fecha", due_date=None)
+        LeadTask.objects.create(lead=self.lead, description="Otra con fecha", due_date=self.tomorrow)
+
+        response = self.client.get(
+            f"/api/crm/leads/{self.lead.id}/tasks/?tenant_slug=codensolar"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tasks = response.data
+        self.assertEqual(tasks[0]["description"], "Con fecha")
+        self.assertEqual(tasks[1]["description"], "Otra con fecha")
+        self.assertIsNone(tasks[2]["due_date"])
+
+    def test_update_task_completed_sets_completed_at(self):
+        """Valida que al completar una tarea se establezca completed_at."""
+
+        task = LeadTask.objects.create(lead=self.lead, description="Tarea por completar")
+        response = self.client.patch(
+            f"/api/crm/leads/{self.lead.id}/tasks/{task.id}/?tenant_slug=codensolar",
+            {"is_completed": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_completed"])
+        self.assertIsNotNone(response.data["completed_at"])
+
+    def test_update_task_uncompleted_clears_completed_at(self):
+        """Valida que al desconpletar una tarea se limpie completed_at."""
+
+        task = LeadTask.objects.create(
+            lead=self.lead,
+            description="Tarea completada",
+            is_completed=True,
+            completed_at=timezone.now()
+        )
+        response = self.client.patch(
+            f"/api/crm/leads/{self.lead.id}/tasks/{task.id}/?tenant_slug=codensolar",
+            {"is_completed": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["is_completed"])
+        self.assertIsNone(response.data["completed_at"])
+
+    def test_update_task_description(self):
+        """Valida que se pueda actualizar la descripción de una tarea."""
+
+        task = LeadTask.objects.create(lead=self.lead, description="Descripción original")
+        response = self.client.patch(
+            f"/api/crm/leads/{self.lead.id}/tasks/{task.id}/?tenant_slug=codensolar",
+            {"description": "Nueva descripción"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["description"], "Nueva descripción")
+
+    def test_delete_task(self):
+        """Valida que se pueda eliminar una tarea."""
+
+        task = LeadTask.objects.create(lead=self.lead, description="Tarea a eliminar")
+        response = self.client.delete(
+            f"/api/crm/leads/{self.lead.id}/tasks/{task.id}/?tenant_slug=codensolar"
+        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(LeadTask.objects.filter(pk=task.id).exists())
+
+    def test_lead_detail_serializer_includes_tasks(self):
+        """Valida que el serializer de lead incluya las tareas."""
+
+        LeadTask.objects.create(lead=self.lead, description="Tarea 1")
+        LeadTask.objects.create(lead=self.lead, description="Tarea 2", is_completed=True)
+        response = self.client.get(f"/api/crm/leads/{self.lead.id}/?tenant_slug=codensolar")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("tasks", response.data)
+        self.assertEqual(len(response.data["tasks"]), 2)

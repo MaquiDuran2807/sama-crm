@@ -14,6 +14,7 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+from django.db import models
 from django.db.models import Avg, Count, Q
 from django.db.models.functions import TruncMonth
 from rest_framework import viewsets, status
@@ -366,8 +367,13 @@ class LeadViewSet(viewsets.ModelViewSet):
         """
         lead = self.get_object()
         if request.method == "GET":
-            tasks_qs = lead.tasks.all().order_by("-created_at")
-            serializer = TaskSerializer(tasks_qs, many=True)
+            tasks_qs = lead.tasks.all().order_by("due_date", "-created_at")
+            tasks_list = list(tasks_qs)
+            tasks_with_null = [t for t in tasks_list if t.due_date is None]
+            tasks_without_null = [t for t in tasks_list if t.due_date is not None]
+            tasks_without_null.sort(key=lambda x: (x.due_date is None, x.due_date, -x.created_at.timestamp()))
+            tasks_sorted = tasks_without_null + tasks_with_null
+            serializer = TaskSerializer(tasks_sorted, many=True)
             return Response(serializer.data)
         serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
@@ -385,7 +391,24 @@ class LeadViewSet(viewsets.ModelViewSet):
         lead = self.get_object()
         task = get_object_or_404(lead.tasks, pk=task_id)
         if request.method == "PATCH":
-            serializer = TaskSerializer(task, data=request.data, partial=True)
+            data = request.data.copy()
+            new_is_completed = data.get("is_completed")
+            if new_is_completed is not None:
+                new_is_completed = new_is_completed in [True, "true", "True", "1", 1]
+                current_is_completed = task.is_completed
+                if new_is_completed and not current_is_completed:
+                    task.completed_at = timezone.now()
+                    task.is_completed = True
+                    task.save(update_fields=["is_completed", "completed_at"])
+                    serializer = TaskSerializer(task)
+                    return Response(serializer.data)
+                elif not new_is_completed and current_is_completed:
+                    task.completed_at = None
+                    task.is_completed = False
+                    task.save(update_fields=["is_completed", "completed_at"])
+                    serializer = TaskSerializer(task)
+                    return Response(serializer.data)
+            serializer = TaskSerializer(task, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)

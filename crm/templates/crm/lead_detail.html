@@ -73,6 +73,31 @@
             Sin etiquetas
         </div>
         {% endif %}
+
+        <hr style="border-color: var(--color-card-border); margin: 1rem 0;">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="mb-0"><strong>Tareas:</strong></p>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="openTasksModal()">
+                <i class="bi bi-check2-square"></i> Gestionar
+            </button>
+        </div>
+        <div id="current-tasks" class="d-flex flex-column gap-2 mb-2">
+            {% for task in lead.tasks.all|slice:":3" %}
+            <div class="task-item d-flex align-items-center gap-2 p-2" style="background: var(--color-surface-hover); border-radius: 8px; {% if task.is_completed %}opacity: 0.6{% endif %}">
+                <input type="checkbox" class="form-check-input" {% if task.is_completed %}checked{% endif %} onchange="toggleTask({{ task.id }})" style="margin: 0;">
+                <span class="{% if task.is_completed %}text-decoration-line-through text-muted{% endif %}" style="flex: 1; font-size: .85rem;">{{ task.description }}</span>
+                {% if task.due_date %}
+                <span class="badge {% if task.is_completed %}bg-secondary{% elif task.due_date|date:"Y-m-d" < today %}bg-danger{% else %}bg-warning{% endif %}" style="font-size: .7rem;">{{ task.due_date|date:"d/m" }}</span>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="deleteTask({{ task.id }})" title="Eliminar">&times;</button>
+            </div>
+            {% empty %}
+            <span class="text-muted" style="font-size: .85rem;">Sin tareas</span>
+            {% endfor %}
+            {% if lead.tasks.count > 3 %}
+            <button type="button" class="btn btn-sm btn-link" onclick="openTasksModal()">Ver todas las tareas ({{ lead.tasks.count }})</button>
+            {% endif %}
+        </div>
     </section>
 
     <!-- Panel de Cambio de Etapa y Notas -->
@@ -276,6 +301,52 @@
                 <div>
                     <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Etiquetas disponibles</h6>
                     <div id="modal-available-tags" class="d-flex flex-wrap gap-2">
+                        <span class="text-muted">Cargando...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal gestionar tareas -->
+<div class="modal fade" id="tasksModal" tabindex="-1" aria-labelledby="tasksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content crm-modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tasksModalLabel">
+                    <i class="bi bi-check2-square"></i> Gestionar Tareas
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Crear nueva tarea -->
+                <div class="mb-4">
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Nueva tarea</h6>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-6">
+                            <input type="text" id="new-task-description" class="form-control" placeholder="Descripción de la tarea" maxlength="255">
+                        </div>
+                        <div class="col-md-4">
+                            <input type="date" id="new-task-due-date" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" onclick="createTask()">
+                                <i class="bi bi-plus-lg"></i> Crear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--color-card-border);">
+
+                <!-- Lista de tareas -->
+                <div>
+                    <h6 class="text-uppercase text-muted mb-3" style="font-size: .75rem; letter-spacing: .05em;">Todas las tareas</h6>
+                    <div id="modal-tasks-list" class="d-flex flex-column gap-2" style="max-height: 400px; overflow-y: auto;">
                         <span class="text-muted">Cargando...</span>
                     </div>
                 </div>

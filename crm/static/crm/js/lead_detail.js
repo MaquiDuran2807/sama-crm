@@ -281,4 +281,94 @@ function initLeadDetail(leadId, tenantSlug, csrfToken) {
             })
             .catch(function() {});
     };
+
+    window.openTasksModal = function() {
+        loadTasks();
+        var modalEl = document.getElementById('tasksModal');
+        if (modalEl) {
+            var modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    };
+
+    function loadTasks() {
+        apiCall(apiBase + '/tasks' + apiQuery, 'GET', null)
+            .then(function(tasks) {
+                renderModalTasks(tasks);
+            })
+            .catch(function() {
+                renderModalTasks([]);
+            });
+    }
+
+    function renderModalTasks(tasks) {
+        var container = document.getElementById('modal-tasks-list');
+        if (!container) return;
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<span class="text-muted small">No hay tareas</span>';
+            return;
+        }
+
+        var today = new Date().toISOString().split('T')[0];
+
+        container.innerHTML = tasks.map(function(task) {
+            var isOverdue = task.due_date && task.due_date < today && !task.is_completed;
+            var isCompleted = task.is_completed;
+            var dueDateClass = isCompleted ? 'bg-secondary' : (isOverdue ? 'bg-danger' : 'bg-warning');
+            var dueDateDisplay = task.due_date ? task.due_date.split('-').reverse().join('/') : '';
+
+            return '<div class="task-item d-flex align-items-center gap-2 p-2" style="background: var(--color-surface-hover); border-radius: 8px; ' + (isCompleted ? 'opacity: 0.6;' : '') + '">' +
+                '<input type="checkbox" class="form-check-input" ' + (task.is_completed ? 'checked' : '') + ' onchange="toggleTask(' + task.id + ')" style="margin: 0;">' +
+                '<span class="' + (isCompleted ? 'text-decoration-line-through text-muted' : '') + '" style="flex: 1; font-size: .85rem;">' + task.description + '</span>' +
+                (task.due_date ? '<span class="badge ' + dueDateClass + '" style="font-size: .7rem;">' + dueDateDisplay + '</span>' : '') +
+                '<button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="deleteTask(' + task.id + ')" title="Eliminar">&times;</button>' +
+                '</div>';
+        }).join('');
+    }
+
+    window.createTask = function() {
+        var descInput = document.getElementById('new-task-description');
+        var dueInput = document.getElementById('new-task-due-date');
+        var description = descInput ? descInput.value.trim() : '';
+        var due_date = dueInput ? dueInput.value : null;
+
+        if (!description) {
+            alert('La descripción de la tarea es obligatoria.');
+            return;
+        }
+
+        var data = { description: description };
+        if (due_date) {
+            data.due_date = due_date;
+        }
+
+        apiCall(apiBase + '/tasks' + apiQuery, 'POST', data)
+            .then(function() {
+                if (descInput) descInput.value = '';
+                if (dueInput) dueInput.value = '';
+                loadTasks();
+                location.reload();
+            })
+            .catch(function() {});
+    };
+
+    window.toggleTask = function(taskId) {
+        apiCall(apiBase + '/tasks/' + taskId + '/' + apiQuery, 'PATCH', { is_completed: true })
+            .then(function() {
+                loadTasks();
+                location.reload();
+            })
+            .catch(function() {});
+    };
+
+    window.deleteTask = function(taskId) {
+        if (!confirm('¿Eliminar esta tarea?')) return;
+        apiCall(apiBase + '/tasks/' + taskId + '/' + apiQuery, 'DELETE', null)
+            .then(function() {
+                loadTasks();
+                location.reload();
+            })
+            .catch(function() {});
+    };
 }
