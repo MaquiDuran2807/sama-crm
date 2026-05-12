@@ -883,25 +883,15 @@ def analytics_api(request, tenant_slug: str):
     ]
 
     # ── Total leads by day (always ALL sources, ignores source filter) ──
-    total_date_counts = (
-        Lead.objects.filter(
-            tenant=tenant,
-            is_deleted=False,
-            created_at__gte=since,
-        )
-        .filter(created_at__lte=timezone.now() - timedelta(days=(offset * days)))
-        if offset > 0
-        else
-        Lead.objects.filter(
-            tenant=tenant,
-            is_deleted=False,
-            created_at__gte=since,
-        )
+    total_qs = Lead.objects.filter(
+        tenant=tenant,
+        is_deleted=False,
+        created_at__gte=since,
     )
     if until:
-        total_date_counts = total_date_counts.filter(created_at__lte=until)
+        total_qs = total_qs.filter(created_at__lte=until)
     total_date_counts = (
-        total_date_counts.extra(select={"day": "DATE(crm_lead.created_at)"})
+        total_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
         .annotate(count=Count("id"))
         .order_by("day")
