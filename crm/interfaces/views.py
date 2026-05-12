@@ -908,6 +908,8 @@ def analytics_api(request, tenant_slug: str):
         closed_result="won",
         created_at__gte=since,
     )
+    if source_filter:
+        won_qs = won_qs.filter(source__platform=source_filter)
     won_date_counts = (
         won_qs.extra(select={"day": "DATE(created_at)"})
         .values("day")
@@ -927,6 +929,8 @@ def analytics_api(request, tenant_slug: str):
         closed_result="lost",
         created_at__gte=since,
     )
+    if source_filter:
+        lost_qs = lost_qs.filter(source__platform=source_filter)
     lost_date_counts = (
         lost_qs.extra(select={"day": "DATE(created_at)"})
         .values("day")
@@ -945,6 +949,8 @@ def analytics_api(request, tenant_slug: str):
         current_stage__icontains="Cotizacion",
         created_at__gte=since,
     )
+    if source_filter:
+        quotes_qs = quotes_qs.filter(source__platform=source_filter)
     quotes_date_counts = (
         quotes_qs.extra(select={"day": "DATE(created_at)"})
         .values("day")
