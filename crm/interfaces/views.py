@@ -870,7 +870,7 @@ def analytics_api(request, tenant_slug: str):
         for row in source_counts
     ]
 
-    # ── Leads by day ──
+    # ── Leads by day (filtered by source if selected) ──
     date_counts = (
         leads_qs.extra(select={"day": "DATE(crm_lead.created_at)"})
         .values("day")
@@ -880,6 +880,35 @@ def analytics_api(request, tenant_slug: str):
     leads_by_day = [
         {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
         for row in date_counts
+    ]
+
+    # ── Total leads by day (always ALL sources, ignores source filter) ──
+    total_date_counts = (
+        Lead.objects.filter(
+            tenant=tenant,
+            is_deleted=False,
+            created_at__gte=since,
+        )
+        .filter(created_at__lte=timezone.now() - timedelta(days=(offset * days)))
+        if offset > 0
+        else
+        Lead.objects.filter(
+            tenant=tenant,
+            is_deleted=False,
+            created_at__gte=since,
+        )
+    )
+    if until:
+        total_date_counts = total_date_counts.filter(created_at__lte=until)
+    total_date_counts = (
+        total_date_counts.extra(select={"day": "DATE(crm_lead.created_at)"})
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    total_leads_by_day = [
+        {"date": row["day"].strftime("%Y-%m-%d") if hasattr(row["day"], "strftime") else str(row["day"]), "count": row["count"]}
+        for row in total_date_counts
     ]
 
     # ── Summary ──
@@ -1084,6 +1113,7 @@ def analytics_api(request, tenant_slug: str):
         "funnel": funnel,
         "leads_by_source": leads_by_source,
         "leads_by_day": leads_by_day,
+        "total_leads_by_day": total_leads_by_day,
         "leads_by_stage_won": leads_by_stage_won,
         "leads_by_stage_lost": leads_by_stage_lost,
         "quotes_sent": quotes_sent,

@@ -156,7 +156,7 @@
             });
 
             renderTimeChart(
-                data.leads_by_day || [],
+                data.total_leads_by_day || [],
                 data.leads_by_stage_won || [],
                 data.leads_by_stage_lost || [],
                 data.quotes_sent || [],
@@ -1041,7 +1041,6 @@
     if (sourceSelect) {
         sourceSelect.addEventListener('change', function() {
             currentSource = sourceSelect.value;
-            console.log('[SourceFilter] changed to:', currentSource, '| calling fetchAnalytics');
             fetchAnalytics();
         });
     }
