@@ -85,3 +85,28 @@ class CustomField(models.Model):
 
     def __str__(self):
         return f"{self.tenant.name} / {self.target_model} / {self.field_name}"
+
+
+class TenantUser(models.Model):
+    """Asocia usuarios Django a un Tenant con rol simple.
+
+    Permite validar a qué tenants tiene acceso un usuario dentro del sistema.
+    """
+    from django.conf import settings
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="tenant_memberships")
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="memberships")
+    role = models.CharField(
+        max_length=20,
+        choices=[("admin", "Administrador"), ("member", "Miembro")],
+        default="member",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["user", "tenant"]
+        verbose_name = "Usuario del Tenant"
+        verbose_name_plural = "Usuarios de los Tenants"
+
+    def __str__(self) -> str:  # type: ignore[override]
+        return f"{self.user.username} → {self.tenant.name} ({self.role})"

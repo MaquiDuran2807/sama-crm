@@ -1,0 +1,10 @@
+629: '            canvas.parentElement.appendChild(overlayLeads);\n'
+630: '        }\n'
+631: '    }\n'
+632: '\n'
+633: '    function renderSourceMixChart(sourceMonthlyData) {\n'
+634: "        var canvas = document.getElementById('source-mix-chart');\n"
+635: '        if (!canvas) return;\n'
+636: '\n'
+637: '        if (charts.sourceMix) {\n'
+638: '            charts.sourceMix.destroy();\n'

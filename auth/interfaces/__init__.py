@@ -1,0 +1,1 @@
+# Interfaces layer: adaptadores HTTP/REST

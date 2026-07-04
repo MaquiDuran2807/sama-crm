@@ -1,0 +1,67 @@
+/* Map CSS */
+.colombia-map-container {
+    position: relative;
+    min-height: 300px;
+}
+
+.colombia-map-container svg {
+    width: 100%;
+    height: auto;
+}
+
+.map-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+}
+
+.map-legend-title {
+    font-weight: 600;
+    margin-right: 0.25rem;
+}
+
+.map-legend-colors {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.map-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.map-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.map-metric-select {
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 6px;
+    color: var(--color-text);
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+}
+
+.map-tooltip {
+    position: fixed;
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    color: var(--color-text-primary);
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 200;
+    white-space: pre-line;
+}

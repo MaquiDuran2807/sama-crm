@@ -1,0 +1,8 @@
+/* Funnel CSS */
+.funnel-summary {
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    margin-top: 0.75rem;
+    font-weight: 500;
+}

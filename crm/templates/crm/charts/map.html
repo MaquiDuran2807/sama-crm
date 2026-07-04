@@ -1,0 +1,19 @@
+{% comment %} Map chart partial {% endcomment %}
+<div class="chart-card">
+    <div class="chart-title">Mapa de Colombia — Leads por departamento</div>
+    <div class="colombia-map-container" id="colombia-svg-map"></div>
+    <div class="map-legend" id="map-legend">
+        <span class="map-legend-title">Ver:</span>
+        <select id="map-metric-select" class="map-metric-select">
+            <option value="total">Total Leads</option>
+            <option value="won">Cerrados Ganados</option>
+            <option value="conversion">Tasa Conversión</option>
+        </select>
+        <div class="map-legend-colors">
+            <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-5)"></span> Alta</span>
+            <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-3)"></span> Media</span>
+            <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-1)"></span> Baja</span>
+            <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-muted)"></span> Sin datos</span>
+        </div>
+    </div>
+</div>

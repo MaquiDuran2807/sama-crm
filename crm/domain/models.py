@@ -1,6 +1,52 @@
 from django.db import models
 from django.utils import timezone
+from django.utils.functional import cached_property
 from tenants.models import Tenant
+
+
+class KpiMetricType(models.Model):
+    """Definicion de un tipo de metric KPI disponible en la plataforma."""
+
+    slug = models.SlugField(max_length=50, primary_key=True)
+    name = models.CharField(max_length=100, help_text="Nombre para mostrar, ej: 'Leads totales'")
+    description = models.TextField(blank=True, help_text="Descripcion del metric")
+    unit = models.CharField(max_length=30, help_text="Unidad de medida, ej: 'leads', '%', 'dias'")
+    icon = models.CharField(max_length=50, help_text="Clase Bootstrap Icon, ej: 'bi-people'")
+    color = models.CharField(max_length=7, help_text="Color hex para UI, ej: '#3b82f6'")
+    category = models.CharField(max_length=50, help_text="Grupo: 'volume', 'conversion', 'revenue', 'efficiency'")
+    sort_order = models.PositiveIntegerField(default=0, help_text="Orden en la UI")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name = "Tipo de Metric KPI"
+        verbose_name_plural = "Tipos de Metric KPI"
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_defaults(cls):
+        return [
+            {"slug": "leads", "name": "Leads totales", "description": "Total de nuevos leads captados", "unit": "leads", "icon": "bi-people", "color": "#3b82f6", "category": "volume", "sort_order": 1},
+            {"slug": "conversions", "name": "Conversiones", "description": "Leads cerrados como ganados", "unit": "leads", "icon": "bi-trophy", "color": "#2ec27e", "category": "conversion", "sort_order": 2},
+            {"slug": "conversion_rate", "name": "Tasa de conversion", "description": "Porcentaje de leads convertidos", "unit": "%", "icon": "bi-graph-up", "color": "#8b5cf6", "category": "conversion", "sort_order": 3},
+            {"slug": "avg_days", "name": "Dias promedio cierre", "description": "Tiempo promedio en dias para cerrar un lead", "unit": "dias", "icon": "bi-clock", "color": "#f5a623", "category": "efficiency", "sort_order": 4},
+            {"slug": "avg_deal_value", "name": "Valor promedio negocio", "description": "Valor promedio por negocio cerrado", "unit": "COP", "icon": "bi-currency-dollar", "color": "#06b6d4", "category": "revenue", "sort_order": 5},
+            {"slug": "revenue", "name": "Ingresos totales", "description": "Suma de valores de negocios cerrados", "unit": "COP", "icon": "bi-wallet2", "color": "#22c55e", "category": "revenue", "sort_order": 6},
+            {"slug": "quotes_sent", "name": "Cotizaciones enviadas", "description": "Total de cotizaciones enviadas a clientes", "unit": "cotiz.", "icon": "bi-file-earmark-text", "color": "#f59e0b", "category": "volume", "sort_order": 7},
+            {"slug": "quotes_accepted", "name": "Cotizaciones aceptadas", "description": "Cotizaciones aceptadas por el cliente", "unit": "cotiz.", "icon": "bi-check-square", "color": "#10b981", "category": "conversion", "sort_order": 8},
+            {"slug": "leads_per_day", "name": "Leads por dia", "description": "Promedio de leads captados por dia", "unit": "leads/dia", "icon": "bi-calendar-day", "color": "#6366f1", "category": "efficiency", "sort_order": 9},
+            {"slug": "pipeline_value", "name": "Valor en pipeline", "description": "Suma de valores de leads activos en pipeline", "unit": "COP", "icon": "bi-stack", "color": "#0ea5e9", "category": "revenue", "sort_order": 10},
+            {"slug": "retention_rate", "name": "Tasa de retencion", "description": "Porcentaje de clientes que repiten compra", "unit": "%", "icon": "bi-person-check", "color": "#a855f7", "category": "conversion", "sort_order": 11},
+            {"slug": "follow_up_rate", "name": "Tasa de seguimiento", "description": "Porcentaje de leads con seguimiento realizado", "unit": "%", "icon": "bi-chat-left-text", "color": "#ec4899", "category": "efficiency", "sort_order": 12},
+            {"slug": "new_contacts", "name": "Contactos nuevos", "description": "Total de contactos nuevos creados", "unit": "contactos", "icon": "bi-person-plus", "color": "#14b8a6", "category": "volume", "sort_order": 13},
+            {"slug": "emails_sent", "name": "Emails enviados", "description": "Campanas de email enviadas", "unit": "emails", "icon": "bi-envelope", "color": "#64748b", "category": "volume", "sort_order": 14},
+            {"slug": "calls_made", "name": "Llamadas realizadas", "description": "Total de llamadas telefonicas realizadas", "unit": "llamadas", "icon": "bi-telephone", "color": "#0d9488", "category": "volume", "sort_order": 15},
+            {"slug": "meetings_scheduled", "name": "Reuniones agendadas", "description": "Reuniones programadas con clientes", "unit": "reuniones", "icon": "bi-calendar-event", "color": "#7c3aed", "category": "volume", "sort_order": 16},
+            {"slug": "cost_per_lead", "name": "Costo por lead", "description": "Costo promedio de adquisicion por lead", "unit": "COP", "icon": "bi-cash-stack", "color": "#b45309", "category": "efficiency", "sort_order": 17},
+            {"slug": "roi", "name": "Retorno de inversion", "description": "ROI de las campanhas de adquisicion", "unit": "%", "icon": "bi-bar-chart", "color": "#059669", "category": "revenue", "sort_order": 18},
+        ]
 
 
 class Contact(models.Model):
@@ -36,13 +82,6 @@ class Contact(models.Model):
         return f"{self.full_name} ({self.phone_number or self.email or 'sin contacto'})"
 
 
-class LeadManager(models.Manager):
-    """Manager que excluye leads marcados como eliminados."""
-
-    def get_queryset(self):
-        return super().get_queryset().filter(is_deleted=False)
-
-
 class LeadQuerySet(models.QuerySet):
     """QuerySet personalizado con métodos de consulta para leads."""
 
@@ -56,6 +95,10 @@ class LeadQuerySet(models.QuerySet):
         return self.filter(is_closed=True)
 
 
+class LeadManager(models.Manager.from_queryset(LeadQuerySet)):
+    """Manager que expone los métodos de LeadQuerySet (active, deleted, closed)."""
+
+
 class Lead(models.Model):
     """Oportunidad de venta. Un contacto puede tener varios leads."""
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="leads")
@@ -66,8 +109,12 @@ class Lead(models.Model):
     notes = models.TextField(blank=True)
     skipped_stages = models.JSONField(default=list)
     is_closed = models.BooleanField(default=False)
-    closed_result = models.CharField(max_length=20, blank=True)  # 'won' o 'lost'
+    closed_result = models.CharField(max_length=20, blank=True)
     is_recompra = models.BooleanField(default=False, db_index=True)
+    deal_value = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True, default=0,
+        help_text="Valor monetario estimado del negocio (COP)"
+    )
 
     custom_fields = models.JSONField(default=dict)
 
@@ -93,8 +140,81 @@ class Lead(models.Model):
         ]
         ordering = ["-updated_at"]
 
+    @cached_property
+    def computed_value(self) -> float:
+        """Valor total del lead: deal_value directo + suma de productos."""
+        direct = float(self.deal_value or 0)
+        product_sum = sum(
+            float(lp.quantity or 1) * float(lp.product.price or 0)
+            for lp in self.lead_products.select_related('product').all()
+        )
+        return direct + product_sum
+
     def __str__(self):
         return f"Lead {self.id} - {self.contact.full_name} ({self.current_stage})"
+
+
+class Product(models.Model):
+    """Producto o servicio que vende un tenant."""
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="products")
+    name = models.CharField(max_length=255, help_text="Nombre del producto o servicio")
+    sku = models.CharField(max_length=100, blank=True, help_text="Codigo SKU del producto")
+    description = models.TextField(blank=True)
+    price = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Precio estandar del producto (COP)"
+    )
+    cost = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Costo de adquisicion del producto (COP)"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Producto"
+        verbose_name_plural = "Productos"
+
+    def __str__(self):
+        return f"{self.name} ({self.tenant.name})"
+
+    @property
+    def margin(self):
+        """Margen bruto si se conoce el costo."""
+        if self.cost and self.price:
+            return float(self.price - self.cost) / float(self.price) * 100 if float(self.price) else 0
+        return None
+
+
+class LeadProduct(models.Model):
+    """Relacion many-to-many entre Lead y Product con cantidad."""
+
+    lead = models.ForeignKey(Lead, on_delete=models.CASCADE, related_name="lead_products")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="lead_products")
+    quantity = models.PositiveIntegerField(default=1, help_text="Cantidad de unidades")
+    unit_price_override = models.DecimalField(
+        max_digits=14, decimal_places=2, null=True, blank=True,
+        help_text="Precio unitario override (si difiere del precio estandar)"
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["lead", "product"]
+        verbose_name = "Producto en Lead"
+        verbose_name_plural = "Productos en Leads"
+
+    def __str__(self):
+        return f"{self.product.name} x{self.quantity} -> Lead {self.lead_id}"
+
+    @property
+    def line_total(self) -> float:
+        """Valor de la linea: cantidad x precio unitario."""
+        price = self.unit_price_override if self.unit_price_override else self.product.price
+        return float(self.quantity or 1) * float(price or 0)
 
 
 class LeadSource(models.Model):
@@ -224,13 +344,7 @@ class Tag(models.Model):
 
 
 class KpiTarget(models.Model):
-    """Meta de KPI para un tenant."""
-
-    class MetricType(models.TextChoices):
-        LEADS = "leads", "Leads totales"
-        CONVERSIONS = "conversions", "Conversiones (Cerrados Ganados)"
-        CONVERSION_RATE = "conversion_rate", "Tasa de conversión"
-        AVG_DAYS = "avg_days", "Días promedio de cierre"
+    """Meta de KPI para un tenant — vinculada a un KpiMetricType."""
 
     class PeriodType(models.TextChoices):
         DAILY = "daily", "Diario"
@@ -239,19 +353,43 @@ class KpiTarget(models.Model):
         QUARTERLY = "quarterly", "Trimestral"
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="kpi_targets")
-    name = models.CharField(max_length=100, help_text="Nombre descriptivo, ej: 'Leads mensuales'")
-    metric_type = models.CharField(max_length=30, choices=MetricType.choices)
-    target_value = models.FloatField(help_text="Valor objetivo, ej: 100.0")
+    metric = models.ForeignKey(KpiMetricType, on_delete=models.CASCADE, related_name="kpi_targets")
+    target_value = models.FloatField(help_text="Valor objetivo")
     period_type = models.CharField(max_length=20, choices=PeriodType.choices, default=PeriodType.MONTHLY)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["metric_type", "period_type"]
+        ordering = ["metric__sort_order", "period_type"]
+        unique_together = ["tenant", "metric", "period_type"]
 
     def __str__(self):
-        return f"{self.name} ({self.tenant.name})"
+        return f"{self.metric.name} - {self.target_value} ({self.tenant.name})"
+
+    @property
+    def metric_type(self):
+        return self.metric.slug if self.metric else ""
+
+    @property
+    def name(self):
+        return self.metric.name if self.metric else ""
+
+    @property
+    def unit(self):
+        return self.metric.unit if self.metric else ""
+
+    @property
+    def icon(self):
+        return self.metric.icon if self.metric else ""
+
+    @property
+    def color(self):
+        return self.metric.color if self.metric else ""
+
+    @property
+    def category(self):
+        return self.metric.category if self.metric else ""
 
 
 class LeadTag(models.Model):

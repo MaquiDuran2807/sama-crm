@@ -1,0 +1,26 @@
+/* Timeline CSS */
+.phase-selector {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.85rem;
+}
+
+.phase-pill {
+    padding: 0.3rem 0.85rem;
+    border-radius: 20px;
+    border: 1.5px solid var(--color-card-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.phase-pill:hover { opacity: 0.8; }
+
+.phase-pill.active {
+    color: inherit;
+    border-color: inherit;
+}

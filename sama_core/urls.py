@@ -17,18 +17,30 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth import views as django_auth_views
 from django.urls import include, path
 
-from ingesta.views import EndpointDocsView, HomeView
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from ingesta.views import EndpointDocsView
+from ingesta.views import HomeView
+from auth.interfaces.web_views import PortalLoginView, TenantSelectView
 
 urlpatterns = [
-    path('', HomeView.as_view(), name='home'),
+    path('home/', HomeView.as_view(), name='home'),
     path('api/docs/', EndpointDocsView.as_view(), name='api-docs'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     path('admin/', admin.site.urls),
+    path('accounts/login/', PortalLoginView.as_view(), name='login'),
+    path('accounts/select-tenant/', TenantSelectView.as_view(), name='auth-tenant-select'),
+    path('accounts/logout/', django_auth_views.LogoutView.as_view(next_page='home'), name='logout'),
+    path('api/auth/', include('auth.interfaces.urls')),
     path('ingesta/', include('ingesta.urls')),
     path('crm/', include('crm.web_urls')),
     path("api/crm/", include("crm.interfaces.urls")),
     path("api/", include("tenants.interfaces.urls")),
+    path('', include('core.web_urls')),
 ]
 
 if settings.DEBUG:

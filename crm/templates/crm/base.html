@@ -63,9 +63,15 @@
                                 <span>Opciones de cuenta</span>
                             </div>
                         </li>
+                        <li><a class="dropdown-item" href="{% url 'home' %}">Ir al home</a></li>
                         <li><a class="dropdown-item" href="/crm/{{ tenant.slug }}/config/">Configuración</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item disabled" href="#" aria-disabled="true" tabindex="-1">Cerrar sesión</a></li>
+                        <li>
+                            <form method="post" action="{% url 'logout' %}" class="px-3 py-1 m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item p-0 text-start">Cerrar sesión</button>
+                            </form>
+                        </li>
                     </ul>
                 </div>
                 {% endblock %}

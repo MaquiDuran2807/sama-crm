@@ -1,0 +1,51 @@
+/* Stats chart CSS */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-card {
+    background: var(--color-card-bg);
+    border: 1px solid var(--color-card-border);
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-smooth);
+}
+
+.summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 14px 0 0 14px;
+}
+
+.summary-card.total::before { background: var(--color-info); }
+.summary-card.conversion::before { background: var(--color-success); }
+.summary-card.avg-days::before { background: var(--color-warning); }
+.summary-card.week::before { background: var(--color-accent); }
+.summary-card.won::before { background: var(--color-success); }
+.summary-card.lost::before { background: var(--color-danger); }
+
+.summary-value {
+    font-size: 1.9rem;
+    font-weight: 800;
+    color: var(--color-text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.summary-label {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 500;
+    margin-top: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}

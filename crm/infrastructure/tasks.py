@@ -10,35 +10,50 @@ garantizando que toda la lógica de negocio fluya por los canales
 autorizados.
 """
 
+import logging
 from datetime import timedelta
 
 from celery import shared_task
+from django.db import transaction
 from django.utils import timezone
 
 from crm.domain.models import Lead
 
+logger = logging.getLogger(__name__)
+
 
 @shared_task(name="crm.tasks.auto_advance_stale_leads")
-def auto_advance_stale_leads(tenant_id: int) -> dict[str, int]:
-    """Avanza los leads estancados de un tenant.
+def auto_advance_stale_leads() -> dict[str, int]:
+    """Avanza los leads estancados de todos los tenants activos.
 
-    Args:
-        tenant_id: PK del tenant sobre el que ejecutar el avance.
+    Itera sobre todos los tenants activos y ejecuta el avance de leads
+    estancados (último contacto > 48h) para cada uno.
 
     Returns:
-        Diccionario con la cantidad de leads avanzada.
+        Diccionario con la cantidad total de leads avanzada.
     """
     from tenants.domain.models import Tenant
     from crm.domain.services import auto_advance_eligible_leads
 
-    try:
-        tenant = Tenant.objects.get(pk=tenant_id)
-    except Tenant.DoesNotExist:
-        return {"advanced": 0, "error": "Tenant no encontrado"}
+    total_advanced = 0
+    tenants = Tenant.objects.filter(is_active=True)
+    for tenant in tenants:
+        try:
+            advanced_qs = auto_advance_eligible_leads(tenant)
+            count = advanced_qs.count()
+            if count:
+                logger.info(
+                    "auto_advance: tenant=%s (pk=%s) avanzó %s leads",
+                    tenant.slug, tenant.pk, count,
+                )
+            total_advanced += count
+        except Exception as exc:
+            logger.exception(
+                "auto_advance: error en tenant=%s (pk=%s): %s",
+                tenant.slug, tenant.pk, exc,
+            )
 
-    advanced_qs = auto_advance_eligible_leads(tenant)
-    count = advanced_qs.count()
-    return {"advanced": count}
+    return {"advanced": total_advanced}
 
 
 @shared_task(name="crm.tasks.permanently_delete_old_leads")
@@ -50,31 +65,33 @@ def permanently_delete_old_leads() -> dict[str, int]:
     ``timezone.now() - timedelta(days=30)`` se borran de la base de
     datos de forma irreversible.
 
+    Uses ``transaction.atomic()`` para asegurar consistencia.
+
     Returns:
         Diccionario con la cantidad de leads eliminados.
     """
     threshold = timezone.now() - timedelta(days=30)
-    deleted_leads = Lead.all_objects.filter(
-        is_deleted=True,
-        deleted_at__lt=threshold,
-    )
-    count = deleted_leads.count()
-    deleted_leads.delete()
+    with transaction.atomic():
+        deleted_leads = Lead.all_objects.filter(
+            is_deleted=True,
+            deleted_at__lt=threshold,
+        )
+        count = deleted_leads.count()
+        deleted_leads.delete()
+
+    logger.info("permanently_delete_old_leads: %s leads eliminados", count)
     return {"permanently_deleted": count}
 
 
 @shared_task(name="crm.tasks.send_task_reminders")
 def send_task_reminders() -> str:
-    """Revisa todas las tareas pendientes y muestra recordatorios en consola.
+    """Revisa todas las tareas pendientes y registra recordatorios.
 
     Esta tarea busca tareas que:
     - No están completadas (is_completed=False)
     - Tienen fecha de vencimiento (due_date no es null)
     - Vencen hoy, mañana, o ya están vencidas
     - Pertenecen a leads no eliminados y no cerrados
-
-    En el futuro, esta tarea podría enviar notificaciones por WhatsApp
-    al tenant o al usuario asignado.
 
     Returns:
         Mensaje con la cantidad de recordatorios procesados.
@@ -106,10 +123,15 @@ def send_task_reminders() -> str:
         else:
             status = f"Vence en {days_until} días"
 
-        print(
-            f"[TASK REMINDER] {lead.tenant.name} | Lead: {lead.contact.full_name} | "
-            f"Tarea: {task.description} | {status} | Due: {task.due_date}"
+        logger.info(
+            "[TASK REMINDER] %s | Lead: %s | Tarea: %s | %s | Due: %s",
+            lead.tenant.name,
+            lead.contact.full_name,
+            task.description,
+            status,
+            task.due_date,
         )
         count += 1
 
+    logger.info("send_task_reminders: %s recordatorios procesados", count)
     return f"Se procesaron {count} recordatorios de tareas."

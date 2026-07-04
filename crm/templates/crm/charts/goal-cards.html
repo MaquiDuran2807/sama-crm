@@ -1,0 +1,16 @@
+{% comment %} Goal Cards chart partial {% endcomment %}
+<div id="goal-cards-container" class="goal-cards-summary">
+    <div class="goal-cards-header">
+        <h3 class="goal-cards-title">Metas KPI</h3>
+        <button class="btn-manage-kpi" id="btn-manage-kpi">
+            <i class="bi bi-gear"></i> Administrar metas
+        </button>
+    </div>
+    <div class="goal-no-targets" id="goal-no-targets">
+        <div class="goal-empty-state">
+            <i class="bi bi-bullseye" style="font-size:2rem;color:var(--color-muted);display:block;margin-bottom:0.5rem"></i>
+            <p style="margin:0 0 0.5rem 0;font-size:0.95rem;color:var(--color-text-secondary)">No hay metas definidas para este período</p>
+        </div>
+    </div>
+    <div id="goal-cards-list" class="goal-cards-list" style="display:none"></div>
+</div>

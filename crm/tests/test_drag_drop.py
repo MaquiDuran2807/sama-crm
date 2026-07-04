@@ -115,21 +115,6 @@ class TestDragDropAPIFlows:
         assert lead_active.is_closed is True
         assert lead_active.closed_result == "won"
 
-    def test_add_note_endpoint(self, db, tenant, lead_active, user):
-        """Endpoint add_note crea actividad tipo note."""
-        client = Client()
-        client.force_login(user)
-        response = client.post(
-            f"/api/crm/leads/{lead_active.id}/add_note/?tenant_slug=testtenant",
-            {"note": "Cliente interesado en paneles solares"},
-            content_type="application/json",
-        )
-        assert response.status_code == status.HTTP_201_CREATED
-        assert LeadActivity.objects.filter(
-            lead=lead_active, activity_type="note_added"
-        ).exists()
-
-
 class TestReopenEndpoint:
     """Tests para el endpoint de reopen (recompra)."""
 

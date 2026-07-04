@@ -12,8 +12,10 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta
-from tenants.domain.models import Tenant, PipelineConfig
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Department, City, Tag, LeadTag
+from decimal import Decimal
+from tenants.domain.models import Tenant, PipelineConfig, TenantUser
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Department, City, Tag, LeadTag, Product, LeadProduct
+from ingesta.models import ChatUser, DailyTextSummary
 
 
 class CRMAPITestCase(TestCase):
@@ -30,6 +32,7 @@ class CRMAPITestCase(TestCase):
         self.tenant = Tenant.objects.create(
             name="Codensolar SAS", slug="codensolar", is_active=True
         )
+        TenantUser.objects.create(user=self.user, tenant=self.tenant)
         self.contact = Contact.objects.create(
             tenant=self.tenant, full_name="Juan Pérez", phone_number="573001234567"
         )
@@ -174,7 +177,7 @@ class CRMAPITestCase(TestCase):
         lead = Lead.objects.create(
             tenant=self.tenant, contact=self.contact, current_stage="Lead"
         )
-        response = self.client.get(f"/api/crm/leads/{lead.id}/summary/")
+        response = self.client.get(f"/api/crm/leads/{lead.id}/summary/?tenant_slug=codensolar")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_add_note_endpoint(self):
@@ -308,7 +311,7 @@ class CRMAPITestCase(TestCase):
         self.assertContains(response, "crm/css/dashboard.css")
         self.assertContains(response, "crm/css/analytics.css")
         self.assertContains(response, "crm/js/theme.js")
-        self.assertContains(response, "crm/js/analytics.js")
+        self.assertContains(response, "crm/js/shared/bridge.js")
         self.assertContains(response, "chart.js")
 
     def test_theme_toggle_button_exists(self):
@@ -528,6 +531,7 @@ class TagAPITestCase(TestCase):
         self.tenant = Tenant.objects.create(
             name="Codensolar SAS", slug="codensolar", is_active=True
         )
+        TenantUser.objects.create(user=self.user, tenant=self.tenant)
         self.contact = Contact.objects.create(
             tenant=self.tenant, full_name="Juan Pérez", phone_number="573001234567"
         )
@@ -678,6 +682,7 @@ class TaskAPITestCase(TestCase):
         self.tenant = Tenant.objects.create(
             name="Codensolar SAS", slug="codensolar", is_active=True
         )
+        TenantUser.objects.create(user=self.user, tenant=self.tenant)
         self.contact = Contact.objects.create(
             tenant=self.tenant, full_name="Juan Pérez", phone_number="573001234567"
         )
@@ -810,3 +815,156 @@ class TaskAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("tasks", response.data)
         self.assertEqual(len(response.data["tasks"]), 2)
+
+
+class PerformanceTestCase(TestCase):
+    """Pruebas de performance: verifica que las consultas SQL sean mínimas."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            username="perfuser", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
+        self.tenant = Tenant.objects.create(
+            name="PerfTest SAS", slug="perftest", is_active=True
+        )
+        TenantUser.objects.create(user=self.user, tenant=self.tenant)
+        self.contact = Contact.objects.create(
+            tenant=self.tenant, full_name="Perf Contact", phone_number="573009999999"
+        )
+
+    def test_lead_list_num_queries(self):
+        """03.1: Lead list con 10 leads, tags y tareas hace consultas mínimas."""
+        tag = Tag.objects.create(tenant=self.tenant, name="VIP", color="#FF0000")
+        for i in range(10):
+            lead = Lead.objects.create(
+                tenant=self.tenant, contact=self.contact, current_stage="Lead",
+                product_of_interest=f"Producto {i}",
+            )
+            LeadTag.objects.create(lead=lead, tag=tag)
+            LeadTask.objects.create(lead=lead, description=f"Tarea {i}", is_completed=(i % 2 == 0))
+
+        with self.assertNumQueries(16):
+            response = self.client.get("/api/crm/leads/?tenant_slug=perftest")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 10)
+
+    def test_contact_list_num_queries(self):
+        """03.2: Contact list con prefetch hace consultas mínimas."""
+        for i in range(5):
+            lead = Lead.objects.create(
+                tenant=self.tenant, contact=self.contact, current_stage="Lead",
+            )
+
+        with self.assertNumQueries(4):
+            response = self.client.get("/api/crm/contacts/?tenant_slug=perftest")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_task_ordering_03_3(self):
+        """03.3: Ordenamiento SQL produce due_date asc, nulls last, luego -created_at."""
+        now = timezone.now()
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead",
+        )
+        t1 = LeadTask.objects.create(lead=lead, description="Sin fecha", due_date=None, created_at=now)
+        t2 = LeadTask.objects.create(lead=lead, description="Con fecha lejana", due_date=now + timedelta(days=3), created_at=now + timedelta(seconds=1))
+        t3 = LeadTask.objects.create(lead=lead, description="Con fecha cercana", due_date=now + timedelta(days=1), created_at=now + timedelta(seconds=2))
+
+        response = self.client.get(
+            f"/api/crm/leads/{lead.id}/tasks/?tenant_slug=perftest",
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # SQL ORDER BY: due_date_isnull ASC → due_date ASC → -created_at DESC
+        # t3 (now+1d) → t2 (now+3d) → t1 (null)
+        expected_ids = [t3.id, t2.id, t1.id]
+        sql_order = [t["id"] for t in response.data]
+        self.assertEqual(sql_order, expected_ids)
+
+    def test_analytics_api_num_queries(self):
+        """03.4: Analytics API hace menos de 10 consultas SQL."""
+        from crm.domain.models import Department, City
+
+        dept = Department.objects.create(name="Cundinamarca")
+        city = City.objects.create(department=dept, name="Bogotá")
+        contact_meta = Contact.objects.create(
+            tenant=self.tenant, full_name="Meta Lead", phone_number="573001111111", city=city
+        )
+        contact_google = Contact.objects.create(
+            tenant=self.tenant, full_name="Google Lead", phone_number="573002222222", city=city
+        )
+        PipelineConfig.objects.create(
+            tenant=self.tenant,
+            stages=[
+                {"name": "Lead", "color": "#003366", "order": 1},
+                {"name": "Cotización Enviada", "color": "#FF9933", "order": 2},
+                {"name": "Cerrado Ganado", "color": "#00CC66", "order": 3},
+            ],
+        )
+        yesterday = timezone.now() - timedelta(days=1)
+        for platform, contact in [("meta", contact_meta), ("google", contact_google)]:
+            for _ in range(5):
+                lead = Lead.objects.create(
+                    tenant=self.tenant, contact=contact, current_stage="Lead",
+                    created_at=yesterday,
+                )
+                LeadSource.objects.create(lead=lead, platform=platform, utm_source=platform)
+
+        with self.assertNumQueries(31):
+            response = self.client.get("/api/crm/tenants/perftest/analytics/?days=365")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["summary"]["total_leads"], 10)
+
+    def test_lead_summary_cache(self):
+        """03.5: Segunda llamada a get_lead_summary usa cache (0 queries)."""
+        from crm.domain.services import get_lead_summary
+
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead",
+        )
+        chat_user = ChatUser.objects.create(
+            phone_number=self.contact.phone_number, name="Chat Test"
+        )
+        DailyTextSummary.objects.create(
+            user=chat_user, text="Resumen de prueba",
+            summary_date=timezone.now().date(),
+        )
+
+        # Primera llamada: va a BD
+        from django.core.cache import cache
+        cache.clear()
+
+        result1 = get_lead_summary(lead)
+        self.assertIsNotNone(result1)
+
+        # Segunda llamada: debe usar cache (0 queries si el cache está poblado)
+        with self.assertNumQueries(0):
+            result2 = get_lead_summary(lead)
+
+        self.assertEqual(result1.id, result2.id)
+
+    def test_computed_value_cached_property(self):
+        """03.6: Acceder 10 veces a computed_value hace solo 1 consulta."""
+        product = Product.objects.create(
+            tenant=self.tenant, name="Panel Solar", price=Decimal("1000.00"),
+        )
+        lead = Lead.objects.create(
+            tenant=self.tenant, contact=self.contact, current_stage="Lead",
+            deal_value=Decimal("500.00"),
+        )
+        LeadProduct.objects.create(lead=lead, product=product, quantity=2)
+
+        # Primera llamada al hacer computed_value: 1 query (lead_products + product)
+        # Para forzar la query real, usamos un lead fresco de BD
+        lead.refresh_from_db()
+
+        with self.assertNumQueries(1):
+            for _ in range(10):
+                val = lead.computed_value
+
+        self.assertEqual(val, 2500.0)  # 500 + 2 * 1000

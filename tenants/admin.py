@@ -8,6 +8,7 @@ de administracion. Incluye inlines para el pipeline y los modulos asociados.
 from django.contrib import admin
 
 from tenants.models import CustomField, PipelineConfig, Tenant, TenantModule
+from tenants.domain.models import TenantUser
 
 
 class TenantModuleInline(admin.TabularInline):
@@ -74,3 +75,12 @@ class CustomFieldAdmin(admin.ModelAdmin):
     list_display = ("tenant", "target_model", "field_name", "field_type", "is_required", "order")
     list_filter = ("target_model", "field_type", "is_required")
     search_fields = ("tenant__name", "field_name")
+
+
+@admin.register(TenantUser)
+class TenantUserAdmin(admin.ModelAdmin):
+    """Registro administrativo para asociar usuarios a tenants."""
+
+    list_display = ("user", "tenant", "role", "created_at")
+    list_filter = ("role", "tenant")
+    search_fields = ("user__username", "tenant__name")

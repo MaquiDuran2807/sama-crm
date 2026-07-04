@@ -6,6 +6,14 @@
 {% block extra_css %}
 <link href="{% static 'crm/css/dashboard.css' %}" rel="stylesheet">
 <link href="{% static 'crm/css/analytics.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/stats.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/goal-cards.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/map.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/region-table.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/funnel.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/source-mix.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/timeline.css' %}" rel="stylesheet">
+<link href="{% static 'crm/css/charts/kpi-modal.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block header_actions %}
@@ -17,7 +25,8 @@
 
 {% block content %}
 <div class="analytics-page" id="main-content">
-    <!-- Filter bar -->
+
+    {# ── Filter bar ── #}
     <div class="filter-bar">
         <div class="filter-left">
             <div class="date-navigator">
@@ -49,7 +58,7 @@
         </div>
     </div>
 
-    <!-- Stats cards -->
+    {# ── Stats cards ── #}
     <div class="summary-cards">
         <div class="summary-card total">
             <div class="summary-value" id="stat-total">—</div>
@@ -77,91 +86,162 @@
         </div>
     </div>
 
-    <!-- Goal cards -->
-    <div id="goal-cards-container" class="goal-cards-summary">
-        <div class="goal-no-targets" id="goal-no-targets">
-            <div class="goal-empty-state">
-                <i class="bi bi-bullseye" style="font-size:2rem;color:var(--color-muted);display:block;margin-bottom:0.5rem"></i>
-                <p style="margin:0 0 0.5rem 0;font-size:0.95rem;color:var(--color-text-secondary)">No hay metas definidas para este período</p>
-                <a href="/crm/{{ tenant.slug }}/settings/kpis/" class="goal-config-link">
-                    <i class="bi bi-gear"></i> Configurar metas
-                </a>
-            </div>
-        </div>
-        <div id="goal-cards-list" class="goal-cards-list" style="display:none"></div>
-    </div>
+    {# ── Goal cards ── #}
+    {% include "crm/charts/goal-cards.html" %}
 
-    <!-- Row 1: Colombia SVG Map + Regional Table -->
+    {# ── Row 1: Map + Region Table ── #}
     <div class="charts-grid-2 mb-4">
-        <div class="chart-card">
-            <div class="chart-title">Mapa de Colombia — Leads por departamento</div>
-            <div class="colombia-map-container" id="colombia-svg-map"></div>
-            <div class="map-legend" id="map-legend">
-                <span class="map-legend-title">Ver:</span>
-                <select id="map-metric-select" class="map-metric-select">
-                    <option value="total">Total Leads</option>
-                    <option value="won">Cerrados Ganados</option>
-                    <option value="conversion">Tasa Conversión</option>
-                </select>
-                <div class="map-legend-colors">
-                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-5)"></span> Alta</span>
-                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-3)"></span> Media</span>
-                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-heat-1)"></span> Baja</span>
-                    <span class="map-legend-item"><span class="map-legend-swatch" style="background:var(--color-muted)"></span> Sin datos</span>
-                </div>
-            </div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-title">Datos por departamento</div>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 region-table" id="region-table">
-                    <thead>
-                        <tr>
-                            <th>Departamento</th>
-                            <th class="text-center">Leads</th>
-                            <th class="text-center">Ganados</th>
-                            <th class="text-center">Perdidos</th>
-                            <th class="text-center">Conv.%</th>
-                        </tr>
-                    </thead>
-                    <tbody id="region-table-body">
-                        <tr><td colspan="3" class="text-center text-muted py-4">Sin datos disponibles</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        {% include "crm/charts/map.html" %}
+        {% include "crm/charts/region-table.html" %}
     </div>
 
-    <!-- Row 2: Funnel + Source Mix -->
+    {# ── Row 2: Funnel + Source Mix ── #}
     <div class="charts-grid-2 mb-4">
-        <div class="chart-card">
-            <div class="chart-title">Embudo de ventas</div>
-            <div class="chart-wrapper">
-                <canvas id="funnel-chart"></canvas>
-            </div>
-            <div class="funnel-summary" id="funnel-summary"></div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-title">Mix de fuentes mensual</div>
-            <div class="chart-wrapper">
-                <canvas id="source-mix-chart"></canvas>
-            </div>
-        </div>
+        {% include "crm/charts/funnel.html" %}
+        {% include "crm/charts/source-mix.html" %}
     </div>
 
-    <!-- Row 3: Timeline (full width) -->
-    <div class="chart-full">
-        <div class="chart-title">Leads en el tiempo</div>
-        <div class="phase-selector" id="phase-selector"></div>
-        <div class="chart-wrapper">
-            <canvas id="timeline-chart"></canvas>
-        </div>
-    </div>
+    {# ── Row 3: Timeline (full width) ── #}
+    {% include "crm/charts/timeline.html" %}
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
-<script src="{% static 'crm/js/analytics.js' %}?v=20260528"></script>
+<script src="{% static 'crm/js/shared/bridge.js' %}?v=20260529"></script>
+<script src="{% static 'crm/js/charts/stats.js' %}"></script>
+<script src="{% static 'crm/js/charts/goal-cards.js' %}"></script>
+<script src="{% static 'crm/js/charts/map.js' %}"></script>
+<script src="{% static 'crm/js/charts/region-table.js' %}"></script>
+<script src="{% static 'crm/js/charts/funnel.js' %}"></script>
+<script src="{% static 'crm/js/charts/source-mix.js' %}"></script>
+<script src="{% static 'crm/js/charts/timeline.js' %}"></script>
+<script src="{% static 'crm/js/charts/kpi-modal.js' %}"></script>
+<script>
+(function() {
+    'use strict';
+
+    {# ── Navigation controls ── #}
+    document.getElementById('prev-period-btn').addEventListener('click', function() {
+        var params = SAMACharts.getParams();
+        if (params.days === 0) return;
+        SAMACharts.setOffset(SAMACharts.getParams().offset + 1);
+        SAMACharts.load();
+        updatePeriodLabel();
+        updateNavButtons();
+    });
+
+    document.getElementById('next-period-btn').addEventListener('click', function() {
+        var params = SAMACharts.getParams();
+        if (params.days === 0 || params.offset <= 0) return;
+        SAMACharts.setOffset(params.offset - 1);
+        SAMACharts.load();
+        updatePeriodLabel();
+        updateNavButtons();
+    });
+
+    document.querySelectorAll('.range-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            SAMACharts.setDays(parseInt(btn.getAttribute('data-days'), 10));
+            SAMACharts.load();
+            updatePeriodLabel();
+            updateNavButtons();
+        });
+    });
+
+    var sourceSelect = document.getElementById('source-filter');
+    if (sourceSelect) {
+        sourceSelect.addEventListener('change', function() {
+            SAMACharts.setSource(sourceSelect.value);
+            SAMACharts.load();
+        });
+    }
+
+    var metricSelect = document.getElementById('map-metric-select');
+    if (metricSelect) {
+        metricSelect.addEventListener('change', function() {
+            if (window.SAMACharts && window.SAMACharts.Map) {
+                window.SAMACharts.Map.setMetric(metricSelect.value);
+            }
+        });
+    }
+
+    var months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    var currentOffset = 0;
+
+    function getPeriodLabel() {
+        var params = SAMACharts.getParams();
+        if (params.days === 0) return 'Historico completo';
+        if (params.days === 7) return 'Ultima semana';
+        if (params.days === 365) return 'Ultimo ano';
+        var now = new Date();
+        var end = new Date(now);
+        var start = new Date(now);
+        start.setDate(start.getDate() - params.days + params.offset * params.days);
+        end.setDate(end.getDate() + params.offset * params.days);
+        if (params.offset !== 0) {
+            return start.getDate() + ' ' + months[start.getMonth()] + ' - ' + end.getDate() + ' ' + months[end.getMonth()];
+        }
+        return 'Ultimos ' + params.days + ' dias';
+    }
+
+    function updatePeriodLabel() {
+        var el = document.getElementById('current-period-label');
+        if (el) el.textContent = getPeriodLabel();
+    }
+
+    function updateNavButtons() {
+        var prevBtn = document.getElementById('prev-period-btn');
+        var nextBtn = document.getElementById('next-period-btn');
+        var params = SAMACharts.getParams();
+        if (params.days === 0) {
+            if (prevBtn) prevBtn.style.visibility = 'hidden';
+            if (nextBtn) nextBtn.style.visibility = 'hidden';
+        } else {
+            if (prevBtn) prevBtn.style.visibility = 'visible';
+            if (nextBtn) nextBtn.style.visibility = params.offset === 0 ? 'hidden' : 'visible';
+        }
+    }
+
+    {# ── KPI Manage button ── #}
+    var kpiBtn = document.getElementById('btn-manage-kpi');
+    if (kpiBtn) {
+        kpiBtn.addEventListener('click', function() {
+            var data = SAMACharts._data;
+            var targets = data && data.kpi_targets ? data.kpi_targets : [];
+            if (window.SAMACharts && window.SAMACharts.KPIModal) {
+                window.SAMACharts.KPIModal.open(targets);
+            }
+        });
+    }
+
+    {# ── Theme handling ── #}
+    window.addEventListener('theme-changed', function() {
+        if (window.SAMACharts) window.SAMACharts.refresh();
+    });
+
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'sama-crm-theme' && window.SAMACharts) {
+            window.SAMACharts.refresh();
+        }
+    });
+
+    {# ── Phase selector init after chart load ── #}
+    window.addEventListener('charts-loaded', function(e) {
+        var data = e.detail;
+        var stageNames = (data.pipeline_stages || []).map(function(s) { return s.name || s; });
+        if (window.SAMACharts && window.SAMACharts.Timeline) {
+            window.SAMACharts.Timeline.renderPhaseSelector(stageNames);
+        }
+    });
+
+    {# ── Initial load ── #}
+    SAMACharts.load();
+    updatePeriodLabel();
+    updateNavButtons();
+})();
+</script>
 {% endblock %}

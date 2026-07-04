@@ -33,5 +33,19 @@ Thumbs.db
 .env
 docker-compose.override.yml
 
-# Ignorar la carpeta de documentación generada
-docs/
+# Coverage
+htmlcov/
+.coverage
+
+# Analysis artifacts
+docs/analysis/
+
+# Excluir docs/changelog del tracking temporal (solo archivos _cambios.md se trackean vía git)
+# docs/changelog/
+
+# Generated files
+celerybeat-schedule
+schema.json
+
+# Keep docs/ versioned — only ignore generated analysis artifacts
+# docs/ is NOT ignored to keep plans, ERDs, and changelogs versioned

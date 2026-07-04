@@ -7,7 +7,7 @@ actualizacion.
 """
 
 from rest_framework import serializers
-from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Tag, LeadTag, KpiTarget
+from crm.domain.models import Contact, Lead, LeadSource, LeadActivity, LeadTask, Tag, LeadTag, KpiTarget, KpiMetricType, Product, LeadProduct
 from ingesta.models import DailyTextSummary
 
 
@@ -83,8 +83,11 @@ class LeadSerializer(serializers.ModelSerializer):
         ]
 
     def get_has_tasks(self, obj):
-        """Devuelve True si el lead tiene tareas no completadas."""
-        return obj.tasks.filter(is_completed=False).exists()
+        """Devuelve True si el lead tiene tareas no completadas.
+        Usa el prefetch de tasks (ya filtrado a no completadas) para
+        evitar consultas adicionales a la BD.
+        """
+        return bool(obj.tasks.all())
 
 
 class LeadDetailSerializer(serializers.ModelSerializer):
@@ -121,13 +124,16 @@ class LeadDetailSerializer(serializers.ModelSerializer):
         """Devuelve lista de {id, name, color} de las etiquetas del lead."""
         return [
             {"id": lt.tag.id, "name": lt.tag.name, "color": lt.tag.color}
-            for lt in obj.lead_tags.select_related("tag").all()
+            for lt in obj.lead_tags.all()
         ]
 
     def get_tasks(self, obj):
-        """Devuelve lista de tareas del lead ordenadas por creacion."""
-        from crm.interfaces.serializers import TaskSerializer
-        return TaskSerializer(obj.tasks.all().order_by("-created_at"), many=True).data
+        """Devuelve lista de tareas del lead ordenadas por creacion.
+        Consulta directa a DB para obtener todas las tareas (incluye completadas),
+        ya que el prefetch cache en listado solo trae tareas no completadas.
+        """
+        tasks = LeadTask.objects.filter(lead=obj).order_by("-created_at")
+        return TaskSerializer(tasks, many=True).data
 
 
 class LeadCreateSerializer(serializers.ModelSerializer):
@@ -158,10 +164,13 @@ class ContactSerializer(serializers.ModelSerializer):
         read_only_fields = ["tenant"]
 
     def get_last_lead(self, obj):
-        """Recupera el ultimo lead del contacto para mostrar contexto comercial."""
-
-        last = obj.leads.order_by("-created_at").first()
-        if last:
+        """Recupera el ultimo lead del contacto para mostrar contexto comercial.
+        Usa el prefetch ``leads`` ordenado por ``-created_at`` para evitar
+        consultas adicionales a la BD.
+        """
+        leads = obj.leads.all()
+        if len(leads) > 0:
+            last = leads[0]
             return {
                 "id": last.id,
                 "current_stage": last.current_stage,
@@ -219,12 +228,93 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class KpiTargetSerializer(serializers.ModelSerializer):
-    """Serializer para metas KPI de un tenant."""
+    metric_slug = serializers.CharField(source="metric.slug", read_only=True)
+    metric_name = serializers.CharField(source="metric.name", read_only=True)
+    metric_unit = serializers.CharField(source="metric.unit", read_only=True)
+    metric_icon = serializers.CharField(source="metric.icon", read_only=True)
+    metric_color = serializers.CharField(source="metric.color", read_only=True)
+    metric_category = serializers.CharField(source="metric.category", read_only=True)
+    metric_type = serializers.CharField(source="metric.slug", read_only=True)
+    name = serializers.CharField(source="metric.name", read_only=True)
 
     class Meta:
         model = KpiTarget
         fields = [
-            "id", "name", "metric_type", "target_value",
-            "period_type", "is_active", "created_at", "updated_at",
+            "id", "metric_slug", "metric_type", "name",
+            "metric_name", "metric_unit", "metric_icon",
+            "metric_color", "metric_category",
+            "target_value", "period_type", "is_active",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class KpiMetricTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KpiMetricType
+        fields = ["slug", "name", "description", "unit", "icon", "color", "category", "sort_order", "is_active"]
+
+
+class KpiTargetCreateSerializer(serializers.ModelSerializer):
+    metric_type = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = KpiTarget
+        fields = ["metric_type", "target_value", "period_type", "is_active"]
+
+    def create(self, validated_data):
+        metric_slug = validated_data.pop("metric_type")
+        tenant = self.context.get("tenant")
+        metric = KpiMetricType.objects.get(slug=metric_slug)
+        return KpiTarget.objects.create(tenant=tenant, metric=metric, **validated_data)
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    """Serializer para productos de un tenant."""
+    margin = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = ["id", "tenant", "name", "sku", "description", "price", "cost", "margin", "is_active", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "tenant"]
+
+    def get_margin(self, obj):
+        return obj.margin
+
+
+class ProductCreateSerializer(serializers.ModelSerializer):
+    """Serializer de escritura para crear productos."""
+    class Meta:
+        model = Product
+        fields = ["name", "sku", "description", "price", "cost", "is_active"]
+
+    def create(self, validated_data):
+        tenant = self.context.get("tenant")
+        return Product.objects.create(tenant=tenant, **validated_data)
+
+
+class LeadProductSerializer(serializers.ModelSerializer):
+    """Serializer para productos asociados a un lead."""
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    product_sku = serializers.CharField(source="product.sku", read_only=True)
+    product_price = serializers.DecimalField(source="product.price", max_digits=14, decimal_places=2, read_only=True)
+    line_total = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LeadProduct
+        fields = ["id", "lead", "product", "product_name", "product_sku", "product_price", "quantity", "unit_price_override", "line_total", "notes", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def get_line_total(self, obj):
+        return obj.line_total
+
+
+class LeadProductCreateSerializer(serializers.ModelSerializer):
+    """Serializer de escritura para agregar productos a un lead."""
+    class Meta:
+        model = LeadProduct
+        fields = ["product", "quantity", "unit_price_override", "notes"]
+
+    def create(self, validated_data):
+        lead = self.context.get("lead")
+        return LeadProduct.objects.create(lead=lead, **validated_data)

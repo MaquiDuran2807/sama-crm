@@ -44,6 +44,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
+from django.core.cache import cache
 from django.db.models import Count, QuerySet
 from django.utils import timezone
 
@@ -283,6 +284,10 @@ def get_lead_summary(lead: Lead) -> DailyTextSummary | None:
     vinculado al lead. Si lo encuentra, retorna el último
     ``DailyTextSummary`` generado para ese usuario.
 
+    Resultado cacheado por 1 hora (``lead_summary_{lead.id}``).
+    La caché se invalida automáticamente mediante señal post_save/post_delete
+    de ``DailyTextSummary`` (ver ``crm.signals``).
+
     Parámetros
     ----------
     lead : Lead
@@ -312,6 +317,14 @@ def get_lead_summary(lead: Lead) -> DailyTextSummary | None:
     >>> if summary:
     ...     print(summary.text)
     """
+    cache_key = f"lead_summary_{lead.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    if not lead.contact:
+        return None
+
     phone_number = (lead.contact.phone_number or "").strip()
     if not phone_number:
         return None
@@ -320,11 +333,13 @@ def get_lead_summary(lead: Lead) -> DailyTextSummary | None:
     if chat_user is None:
         return None
 
-    return (
+    result = (
         DailyTextSummary.objects.filter(user=chat_user)
         .order_by("-summary_date", "-updated_at")
         .first()
     )
+    cache.set(cache_key, result, 3600)
+    return result
 
 
 def get_leads_stats(tenant: Any) -> dict[str, Any]:

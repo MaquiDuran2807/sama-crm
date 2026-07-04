@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegir tenant | SAMA AdTech</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #0a0f1e; color: #e8edf5; }
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 18px; }
+        .hero { background: linear-gradient(135deg, #003366, #0f172a); border-radius: 18px; padding: 28px; }
+        .hero h1 { margin: 0 0 10px; }
+        .hero p { margin: 0; color: #cbd5e1; line-height: 1.5; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 22px; }
+        .card { background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 16px; padding: 18px; }
+        .card h2 { margin: 0 0 8px; font-size: 20px; }
+        .meta { color: #94a3b8; font-size: 14px; margin-bottom: 14px; }
+        .btn { display: inline-block; text-decoration: none; background: #ff9933; color: #111827; font-weight: 700; padding: 10px 14px; border-radius: 10px; }
+        .empty { margin-top: 18px; color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="hero">
+            <h1>Elige el tenant que quieres abrir</h1>
+            <p>Selecciona un tenant para entrar a su dashboard operativo.</p>
+        </section>
+
+        {% if tenants %}
+        <section class="grid">
+            {% for tenant in tenants %}
+            <article class="card">
+                <h2>{{ tenant.name }}</h2>
+                <div class="meta">{{ tenant.slug }} · {% if tenant.is_active %}Activo{% else %}Inactivo{% endif %}</div>
+                <a class="btn" href="{% url 'crm_web:dashboard' tenant_slug=tenant.slug %}">Entrar al dashboard</a>
+            </article>
+            {% endfor %}
+        </section>
+        {% else %}
+        <p class="empty">No hay tenants activos disponibles.</p>
+        {% endif %}
+    </main>
+</body>
+</html>

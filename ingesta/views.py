@@ -1,8 +1,4 @@
 import logging
-import threading
-import traceback
-import uuid
-from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Count, Q
@@ -10,26 +6,18 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views import View
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.authentication import BasicAuthentication, SessionAuthentication
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import EvolutionInstance
 from .services import IngestionService
+from celery.result import AsyncResult
+from .tasks import sync_messages_task, run_text_summaries_task, generate_audio_briefing_task
+
 
 logger = logging.getLogger(__name__)
-
-
-SYNC_JOBS = {}
-SYNC_JOBS_LOCK = threading.Lock()
-
-
-def _update_job(job_id: str, **changes):
-	with SYNC_JOBS_LOCK:
-		job = SYNC_JOBS.get(job_id)
-		if not job:
-			return
-		job.update(changes)
 
 
 def _is_numeric(text: str) -> bool:
@@ -45,53 +33,15 @@ def _is_numeric(text: str) -> bool:
 
 
 class SyncTriggerView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def post(self, request, *args, **kwargs):
 		instance_name = request.data.get("instance_name", "default")
-		job_id = str(uuid.uuid4())
-		with SYNC_JOBS_LOCK:
-			SYNC_JOBS[job_id] = {
-				"job_id": job_id,
-				"instance_name": instance_name,
-				"status": "queued",
-				"progress": 0,
-				"message": "Esperando inicio",
-				"result": None,
-				"error": None,
-			}
-
-		def runner():
-			service = IngestionService(instance_name=instance_name)
-			try:
-				_update_job(job_id, status="running", progress=1, message="Iniciando tarea")
-
-				def on_progress(percent, message):
-					_update_job(job_id, status="running", progress=percent, message=message)
-
-				result = service.sync_messages(progress_callback=on_progress)
-				_update_job(
-					job_id,
-					status="completed",
-					progress=100,
-					message="Proceso completado",
-					result=result,
-				)
-			except Exception as exc:
-				logger.exception("Fallo en sincronizacion para job_id=%s", job_id)
-				_update_job(
-					job_id,
-					status="failed",
-					message="Error durante la sincronizacion",
-					error=str(exc),
-					traceback=traceback.format_exc(),
-				)
-
-		threading.Thread(target=runner, daemon=True).start()
+		task = sync_messages_task.delay(instance_name=instance_name)
 		return Response(
 			{
-				"job_id": job_id,
+				"job_id": task.id,
 				"status": "queued",
 				"progress": 0,
 				"message": "Tarea creada",
@@ -101,23 +51,62 @@ class SyncTriggerView(APIView):
 
 
 class SyncStatusView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def get(self, request, job_id, *args, **kwargs):
-		with SYNC_JOBS_LOCK:
-			job = SYNC_JOBS.get(job_id)
-		if not job:
-			return Response(
-				{"detail": "job_id no encontrado"},
-				status=status.HTTP_404_NOT_FOUND,
-			)
-		return Response(job, status=status.HTTP_200_OK)
+		res = AsyncResult(job_id)
+		state = res.state
+		
+		status_map = {
+			"PENDING": "queued",
+			"RECEIVED": "queued",
+			"STARTED": "running",
+			"SUCCESS": "completed",
+			"FAILURE": "failed",
+			"REVOKED": "failed",
+		}
+		mapped_status = status_map.get(state, state.lower())
+		
+		progress = 0
+		message = ""
+		result = None
+		error = None
+		tb = None
+		
+		if state == "SUCCESS":
+			progress = 100
+			message = "Proceso completado"
+			result = res.result
+		elif state == "FAILURE":
+			progress = 100
+			message = "Error durante la ejecución"
+			error = str(res.result)
+			tb = res.traceback
+		else:
+			info = res.info
+			if isinstance(info, dict):
+				progress = info.get("progress", 0)
+				message = info.get("message", "")
+				mapped_status = info.get("status", mapped_status)
+				result = info.get("result")
+				error = info.get("error")
+				tb = info.get("traceback")
+				
+		return Response({
+			"job_id": job_id,
+			"status": mapped_status,
+			"progress": progress,
+			"message": message,
+			"result": result,
+			"error": error,
+			"traceback": tb,
+		}, status=status.HTTP_200_OK)
 
 
 class InstancesListView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def get(self, request, *args, **kwargs):
 		instances = EvolutionInstance.objects.filter(is_active=True).values("id", "instance_name", "description")
@@ -551,8 +540,8 @@ class CrmUserDetailView(View):
 
 
 class ChatUserRenameView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def post(self, request, *args, **kwargs):
 		from .models import ChatUser
@@ -583,182 +572,22 @@ class ChatUserRenameView(APIView):
 
 
 class SummaryTriggerView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def post(self, request, *args, **kwargs):
-		from datetime import timedelta
-
-		from .summary_service import TextSummaryService
-	
 		lookback_hours = int(request.data.get("lookback_hours", 12))
 		force = bool(request.data.get("force", False))
 		accumulate = bool(request.data.get("accumulate", True))
-		job_id = str(uuid.uuid4())
-	
-		with SYNC_JOBS_LOCK:
-			SYNC_JOBS[job_id] = {
-				"job_id": job_id,
-				"type": "summary",
-				"status": "queued",
-				"progress": 0,
-				"message": "Esperando inicio",
-				"result": None,
-				"error": None,
-			}
-	
-		def runner():
-			try:
-				_update_job(job_id, status="running", progress=10, message="Iniciando resúmenes IA")
-				
-				now = timezone.now()
-				slot_end = now
-				
-				service = TextSummaryService()
-				if accumulate:
-					slot_start, window_meta = service.compute_accumulation_window(
-						slot_end=slot_end,
-						fallback_lookback_hours=lookback_hours,
-					)
-				else:
-					slot_start = slot_end - timedelta(hours=lookback_hours)
-					window_meta = {
-						"mode": "fixed_lookback",
-						"today_start": None,
-						"oldest_pending_day": None,
-						"has_today_text": None,
-					}
 
-				run_key = f"manual_{job_id}"
-
-				mode_label = {
-					"accumulation_pending_backlog": "acumulacion historica + hoy",
-					"today_refresh": "actualizacion de hoy",
-					"fallback_lookback": "ventana fallback",
-					"fixed_lookback": "ventana fija",
-				}.get(window_meta.get("mode"), "procesamiento")
-
-				_update_job(
-					job_id,
-					status="running",
-					progress=15,
-					message=f"Preparando {mode_label}",
-				)
-
-				def on_summary_progress(state):
-					total = max(1, int(state.get("eligible_users") or 0))
-					done = int(state.get("processed_users") or 0) + int(state.get("failed_users") or 0) + int(state.get("skipped_users") or 0)
-					if state.get("phase") == "processing_days":
-						current_user_index = int(state.get("current_user_index") or 1)
-						day_total = max(1, int(state.get("current_user_total_days") or 1))
-						day_done = max(0, min(day_total, int(state.get("current_user_day_done") or 0)))
-						effective_done = min(total, (current_user_index - 1) + (day_done / day_total))
-					else:
-						effective_done = done
-
-					pct = 15 + int((effective_done / total) * 80)
-					pct = max(15, min(95, pct))
-					_update_job(
-						job_id,
-						status="running",
-						progress=pct,
-						message=(
-							f"Resumiendo usuarios ({done}/{total}) - {mode_label}"
-						),
-					)
-
-				log = service.run_for_slot(
-					slot_start=slot_start,
-					slot_end=slot_end,
-					run_key=run_key,
-					force=force,
-					progress_callback=on_summary_progress,
-				)
-				log.meta = {
-					**(log.meta or {}),
-					**window_meta,
-				}
-				log.save(update_fields=["meta"])
-				
-				daily_rows = list(log.daily_summaries.select_related("user").order_by("user_id", "summary_date"))
-				monthly_rows = list(log.monthly_summaries.select_related("user").order_by("user_id", "year", "month", "-revision"))
-
-				daily_report = []
-				for row in daily_rows:
-					label = row.user.name or row.user.phone_number or row.user.wa_id
-					daily_report.append(
-						{
-							"user_id": row.user_id,
-							"chat": label,
-							"date": row.summary_date.isoformat(),
-							"has_data": row.has_data,
-							"source_message_count": row.source_message_count,
-							"tokens": row.total_tokens,
-							"text": row.text,
-						}
-					)
-
-				monthly_report = []
-				for row in monthly_rows:
-					label = row.user.name or row.user.phone_number or row.user.wa_id
-					monthly_report.append(
-						{
-							"user_id": row.user_id,
-							"chat": label,
-							"year": row.year,
-							"month": row.month,
-							"revision": row.revision,
-							"has_data": row.has_data,
-							"source_message_count": row.source_message_count,
-							"tokens": row.total_tokens,
-							"text": row.text,
-						}
-					)
-
-				result = {
-					"run_key": log.run_key,
-					"status": log.status,
-					"eligible_users": log.eligible_users,
-					"processed_users": log.processed_users,
-					"failed_users": log.failed_users,
-					"daily_summaries_created": log.daily_summaries_created,
-					"daily_summaries_updated": log.daily_summaries_updated,
-					"monthly_summaries_created": log.monthly_summaries_created,
-					"monthly_summaries_updated": log.monthly_summaries_updated,
-					"total_tokens": log.total_tokens,
-					"slot_start": slot_start.isoformat(),
-					"slot_end": slot_end.isoformat(),
-					"window_mode": window_meta.get("mode"),
-					"window_oldest_pending_day": window_meta.get("oldest_pending_day"),
-					"window_has_today_text": window_meta.get("has_today_text"),
-					"window_step_hours": window_meta.get("accumulation_step_hours"),
-					"window_cursor_start": window_meta.get("accumulation_cursor_start"),
-					"window_reached_oldest": window_meta.get("accumulation_reached_oldest"),
-					"daily_generated": daily_report,
-					"monthly_generated": monthly_report,
-				}
-				
-				_update_job(
-					job_id,
-					status="completed",
-					progress=100,
-					message=f"Resúmenes IA completados ({window_meta.get('mode')})",
-					result=result,
-				)
-			except Exception as exc:
-				logger.exception("Fallo en resúmenes IA para job_id=%s", job_id)
-				_update_job(
-					job_id,
-					status="failed",
-					message="Error durante resúmenes IA",
-					error=str(exc),
-					traceback=traceback.format_exc(),
-				)
-	
-		threading.Thread(target=runner, daemon=True).start()
+		task = run_text_summaries_task.delay(
+			lookback_hours=lookback_hours,
+			force=force,
+			accumulate=accumulate,
+		)
 		return Response(
 			{
-				"job_id": job_id,
+				"job_id": task.id,
 				"status": "queued",
 				"progress": 0,
 				"message": "Tarea de resúmenes creada",
@@ -768,114 +597,24 @@ class SummaryTriggerView(APIView):
 
 
 class AudioBriefingTriggerView(APIView):
-	permission_classes = [AllowAny]
-	authentication_classes = []
+	authentication_classes = [SessionAuthentication, BasicAuthentication]
+	permission_classes = [IsAuthenticated]
 
 	def post(self, request, *args, **kwargs):
-		from .audio_service import AudioBriefingService
-		from .models import ChatUser
-
 		instance_name = str(request.data.get("instance_name") or "default").strip()
 		raw_team_user_id = request.data.get("team_user_id")
 		try:
 			team_user_id = int(raw_team_user_id) if raw_team_user_id not in (None, "", "null") else None
 		except (TypeError, ValueError):
 			team_user_id = None
-		job_id = str(uuid.uuid4())
 
-		with SYNC_JOBS_LOCK:
-			SYNC_JOBS[job_id] = {
-				"job_id": job_id,
-				"type": "audio_briefing",
-				"instance_name": instance_name,
-				"status": "queued",
-				"progress": 0,
-				"message": "Esperando inicio",
-				"result": None,
-				"error": None,
-			}
-
-		def runner():
-			try:
-				_update_job(job_id, status="running", progress=10, message="Inicializando audio briefing")
-
-				team_user = None
-				if team_user_id:
-					team_user = ChatUser.objects.filter(id=team_user_id).first()
-					if not team_user:
-						_update_job(
-							job_id,
-							status="running",
-							progress=12,
-							message=f"team_user_id={team_user_id} no existe, usando fallback automático",
-						)
-
-				if not team_user:
-					team_user = ChatUser.objects.filter(is_customer=False).order_by("-last_interaction", "id").first()
-
-				if not team_user:
-					team_user = ChatUser.objects.order_by("-last_interaction", "id").first()
-
-				if not team_user:
-					raise ValueError("No hay usuario de equipo disponible para generar el briefing")
-
-				service = AudioBriefingService()
-
-				def on_audio_progress(state: dict):
-					pct = max(10, min(95, int(state.get("progress") or 10)))
-					phase = str(state.get("phase") or "proceso")
-					detail = str(state.get("detail") or "")
-					_update_job(
-						job_id,
-						status="running",
-						progress=pct,
-						message=f"Audio briefing [{phase}] {detail}".strip(),
-					)
-
-				result = service.generate_daily_briefing(
-					instance_name=instance_name,
-					team_user=team_user,
-					date=timezone.now(),
-					force_local_only=True,
-					progress_callback=on_audio_progress,
-				)
-
-				if result.get("error"):
-					raise RuntimeError(result["error"])
-
-				audio_file = str(result.get("audio_file") or "").lstrip("/")
-				media_url = str(getattr(settings, "MEDIA_URL", "/media/") or "/media/")
-				if not media_url.endswith("/"):
-					media_url = f"{media_url}/"
-				if audio_file:
-					result["audio_download_url"] = f"{media_url}{audio_file}"
-				result["selected_team_user"] = {
-					"id": team_user.id,
-					"display_label": team_user.display_label(),
-				}
-				result["delivery_mode"] = "download_only"
-
-				_update_job(
-					job_id,
-					status="completed",
-					progress=100,
-					message="Audio briefing completado (descarga local)",
-					result=result,
-				)
-			except Exception as exc:
-				logger.exception("Fallo en audio briefing para job_id=%s", job_id)
-				_update_job(
-					job_id,
-					status="failed",
-					message="Error durante audio briefing",
-					error=str(exc),
-					traceback=traceback.format_exc(),
-				)
-
-		threading.Thread(target=runner, daemon=True).start()
+		task = generate_audio_briefing_task.delay(
+			instance_name=instance_name,
+			team_user_id=team_user_id,
+		)
 		return Response(
 			{
-				"job_id": job_id,
+				"job_id": task.id,
 				"status": "queued",
 				"progress": 0,
 				"message": "Tarea de audio briefing creada",
@@ -935,6 +674,8 @@ class HomeView(View):
 
 
 class EndpointDocsView(APIView):
+	# Endpoint público intencionalmente: solo expone documentación de la API,
+	# no datos sensibles ni acciones de escritura.
 	permission_classes = [AllowAny]
 	authentication_classes = []
 

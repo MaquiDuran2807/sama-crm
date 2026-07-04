@@ -1,0 +1,113 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sama_dev}
+      POSTGRES_USER: ${DB_USER:-sama}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-sama_dev_pass}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sama -d sama_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: sama_core.settings.development
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-sama_dev}
+      DB_USER: ${DB_USER:-sama}
+      DB_PASSWORD: ${DB_PASSWORD:-sama_dev_pass}
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DEBUG: ${DEBUG:-True}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  celery_worker:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: sama_core.settings.development
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-sama_dev}
+      DB_USER: ${DB_USER:-sama}
+      DB_PASSWORD: ${DB_PASSWORD:-sama_dev_pass}
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DEBUG: ${DEBUG:-True}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A sama_core worker -l info
+
+  celery_beat:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      DJANGO_SETTINGS_MODULE: sama_core.settings.development
+      DB_ENGINE: django.db.backends.postgresql
+      DB_NAME: ${DB_NAME:-sama_dev}
+      DB_USER: ${DB_USER:-sama}
+      DB_PASSWORD: ${DB_PASSWORD:-sama_dev_pass}
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DEBUG: ${DEBUG:-True}
+      SECRET_KEY: ${SECRET_KEY:-dev-only-change-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A sama_core beat -l info
+
+volumes:
+  postgres_data:
+  redis_data:

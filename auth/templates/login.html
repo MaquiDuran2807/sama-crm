@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Accede a SAMA AdTech - Automatización inteligente para tu negocio">
+    <meta name="theme-color" content="#0a0f1e">
+    <title>SAMA AdTech | Iniciar Sesión</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --sama-blue: #003366;
+            --sama-blue-light: #004c99;
+            --sama-orange: #FF9933;
+            --sama-orange-glow: rgba(255, 153, 51, 0.4);
+            --bg-deep: #060b14;
+            --bg-card: rgba(14, 20, 35, 0.85);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-primary: #e8edf5;
+            --text-secondary: #8899b4;
+            --text-muted: #5a6d85;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 22px;
+            --transition-fast: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-smooth: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ─── Fondo animado: partículas flotantes ─── */
+        .particles-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: var(--sama-orange);
+            box-shadow: 0 0 8px var(--sama-orange-glow);
+            animation: floatUp linear infinite;
+            opacity: 0;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(0.4);
+                opacity: 0;
+            }
+            15% {
+                opacity: 0.7;
+            }
+            85% {
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateY(-110vh) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        /* Grid cuántico de fondo */
+        .quantum-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.06;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+            background-size: 60px 60px;
+            mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+        }
+
+        /* ─── Contenedor principal del login ─── */
+        .login-wrapper {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            padding: 0 1.5rem;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 2.8rem 2.2rem;
+            box-shadow:
+                0 0 0 1px rgba(255, 153, 51, 0.08) inset,
+                0 24px 60px rgba(0, 0, 0, 0.5),
+                0 0 80px rgba(0, 51, 102, 0.15);
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-smooth);
+        }
+
+        /* Borde luminoso animado */
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            border-radius: var(--radius-lg);
+            border: 1.5px solid transparent;
+            background: linear-gradient(135deg,
+                    var(--sama-orange) 0%,
+                    var(--sama-blue-light) 30%,
+                    var(--sama-orange) 60%,
+                    transparent 80%) border-box;
+            -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            animation: borderGlow 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes borderGlow {
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ─── Logo ─── */
+        .logo-section {
+            text-align: center;
+            margin-bottom: 2.2rem;
+        }
+
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--sama-blue) 0%, var(--sama-blue-light) 100%);
+            border-radius: var(--radius-md);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 0.8rem;
+            box-shadow:
+                0 0 30px rgba(0, 51, 102, 0.5),
+                0 8px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .logo-icon::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: inherit;
+            border: 2px solid var(--sama-orange);
+            opacity: 0.6;
+            animation: pulseRing 2.5s ease-out infinite;
+        }
+
+        @keyframes pulseRing {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1.25);
+                opacity: 0;
+            }
+        }
+
+        .logo-text {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: #fff;
+        }
+
+        .logo-text span {
+            color: var(--sama-orange);
+        }
+
+        .logo-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-top: 0.15rem;
+            letter-spacing: 0.04em;
+        }
+
+        /* ─── Formulario ─── */
+        .form-group {
+            margin-bottom: 1.4rem;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.45rem;
+            letter-spacing: 0.02em;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            pointer-events: none;
+            transition: color var(--transition-fast);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.85rem 1rem 0.85rem 2.8rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1.5px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-family: var(--font-sans);
+            transition: all var(--transition-fast);
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: var(--sama-orange);
+            box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.12), 0 0 20px rgba(255, 153, 51, 0.06);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .form-input:focus~.input-icon,
+        .form-input:focus+.input-icon {
+            color: var(--sama-orange);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* ─── Opciones adicionales ─── */
+        .options-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.8rem;
+            font-size: 0.85rem;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            user-select: none;
+        }
+
+        .remember-me input[type="checkbox"] {
+            display: none;
+        }
+
+        .custom-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--text-muted);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+            flex-shrink: 0;
+        }
+
+        .remember-me input[type="checkbox"]:checked+.custom-checkbox {
+            background: var(--sama-orange);
+            border-color: var(--sama-orange);
+        }
+
+        .remember-me input[type="checkbox"]:checked+.custom-checkbox::after {
+            content: '✓';
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #000;
+        }
+
+        .forgot-password {
+            color: var(--sama-orange);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+        }
+
+        .forgot-password:hover {
+            color: #ffb366;
+            text-shadow: 0 0 12px rgba(255, 153, 51, 0.3);
+        }
+
+        /* ─── Botón de login ─── */
+        .btn-login {
+            width: 100%;
+            padding: 0.9rem;
+            background: linear-gradient(135deg, var(--sama-orange) 0%, #e68a2e 100%);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #000;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            letter-spacing: 0.02em;
+            transition: all var(--transition-fast);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(255, 153, 51, 0.25);
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 153, 51, 0.4);
+            background: linear-gradient(135deg, #ffaa44 0%, #f09030 100%);
+        }
+
+        .btn-login:active {
+            transform: scale(0.97);
+        }
+
+        .btn-login .btn-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ─── Footer del formulario ─── */
+        .login-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .login-footer a {
+            color: var(--sama-orange);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        /* ─── Mensaje de error (opcional, para Django) ─── */
+        .error-message {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: var(--radius-sm);
+            padding: 0.7rem 1rem;
+            margin-bottom: 1.2rem;
+            font-size: 0.85rem;
+            color: #fca5a5;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 500px) {
+            .login-card {
+                padding: 2rem 1.5rem;
+            }
+            .logo-icon {
+                width: 52px;
+                height: 52px;
+                font-size: 1.4rem;
+            }
+            .logo-text {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Fondo: grid cuántico -->
+    <div class="quantum-grid"></div>
+
+    <!-- Fondo: partículas -->
+    <div class="particles-layer" id="particles-layer"></div>
+
+    <!-- Contenedor del login -->
+    <div class="login-wrapper">
+        <div class="login-card">
+            <!-- Logo SAMA -->
+            <div class="logo-section">
+                <div class="logo-icon">S</div>
+                <div class="logo-text">SAMA<span>.</span></div>
+                <div class="logo-subtitle">AdTech Platform</div>
+            </div>
+
+            <!-- Mensaje de error (oculto por defecto; Django puede inyectarlo) -->
+            <!-- <div class="error-message">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                Credenciales incorrectas. Inténtalo de nuevo.
+            </div> -->
+
+            <!-- Formulario (compatible con Django LoginView) -->
+            <form method="post" action="/accounts/login/">
+                <!-- CSRF Token para Django -->
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+                <div class="form-group">
+                    <label class="form-label" for="id_username">Usuario o Email</label>
+                    <div class="input-wrapper">
+                        <i class="bi bi-person input-icon"></i>
+                        <input
+                            type="text"
+                            name="username"
+                            id="id_username"
+                            class="form-input"
+                            placeholder="tu@empresa.com"
+                            autocomplete="username"
+                            required
+                            autofocus
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="id_password">Contraseña</label>
+                    <div class="input-wrapper">
+                        <i class="bi bi-lock input-icon"></i>
+                        <input
+                            type="password"
+                            name="password"
+                            id="id_password"
+                            class="form-input"
+                            placeholder="••••••••"
+                            autocomplete="current-password"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <label class="remember-me">
+                        <input type="checkbox" name="remember_me">
+                        <span class="custom-checkbox"></span>
+                        Recordarme
+                    </label>
+                    <a href="/accounts/password_reset/" class="forgot-password">¿Olvidaste tu contraseña?</a>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    <span class="btn-text">Iniciar Sesión</span>
+                </button>
+            </form>
+
+            <div class="login-footer">
+                ¿No tienes cuenta? <a href="#">Solicitar acceso</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de partículas -->
+    <script>
+        (function() {
+            const layer = document.getElementById('particles-layer');
+            const colors = ['#FF9933', '#ffb366', '#ff8533', '#ff7700'];
+            const particleCount = 35;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+
+                const size = Math.random() * 5 + 2;
+                particle.style.width = size + 'px';
+                particle.style.height = size + 'px';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.bottom = -(Math.random() * 30 + 5) + 'px';
+                particle.style.animationDuration = (Math.random() * 12 + 8) + 's';
+                particle.style.animationDelay = (Math.random() * 10) + 's';
+                particle.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+                layer.appendChild(particle);
+            }
+        })();
+    </script>
+</body>
+</html>

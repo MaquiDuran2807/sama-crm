@@ -1,0 +1,1 @@
+# Domain layer: lógica de negocio pura
